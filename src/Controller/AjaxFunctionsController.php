@@ -2089,7 +2089,282 @@ class AjaxFunctionsController extends AppController{
 		}
 		exit;
 	}	
+	// ADD SAMPLE DETAILS
+	// @AUTHOR : SHANKHPAL SHENDE
+	// Description : For adding the sample details created for Routine Inspection flow  (RTI)
+	// DATE : 21/12/2022
+
+	// function updated on 13/06/2023 by shankhpal shende
+  
+	public function addSampleDetails() {
+		
+		$this->autoRender = false;
+		$this->loadModel('DmiCheckSamples');
+		// call customes Controller 
+		$CustomersController = new CustomersController;
+		$customer_id = $this->Customfunctions->sessionCustomerID();
+		// added version for inserting version in this table by shankhpal on 08/06/2023
+		$current_version = $CustomersController->Customfunctions->currentVersion($customer_id);
+		
+		$firm_type = $this->Customfunctions->firmType($customer_id);
+		// change name
+		$commodity_code = htmlentities($_POST['commodity_name'], ENT_QUOTES);
+		
+		$pack_size = htmlentities($_POST['pack_size'], ENT_QUOTES);
+		$lot_no = htmlentities($_POST['lot_no'], ENT_QUOTES);
+		$date_of_packing = htmlentities($_POST['date_of_packing'], ENT_QUOTES);
+		$best_before = htmlentities($_POST['best_before'], ENT_QUOTES);
+		$replica_si_no = htmlentities($_POST['replica_si_no'], ENT_QUOTES);
+
+		$save_details_result = $this->DmiCheckSamples->saveSampleDetails($commodity_code,$pack_size,$lot_no,$date_of_packing,$best_before,$replica_si_no,$current_version);// call custome method from model
+		
+		$added_sample_details = $this->DmiCheckSamples->RoutineInspectionSampleDetails();
+		
+		$this->Set('section_form_details',$added_sample_details);
+		
+		$this->render('/element/rti_addmore_element/rti_addmore_element');
+	}
+
+
+
+	// Add Package Details
+	// @AUTHOR : SHANKHPAL SHENDE
+	// Description : To add package details created for Routine Inspection flow  (RTI)
+	// DATE : 27/12/2022
+  
+	public function addPackageDetails() {
+		
+		$this->autoRender = false;
+		$this->loadModel('DmiRtiPackerDetails');
+
+		$customer_id = $this->Customfunctions->sessionCustomerID();
+
+		$CustomersController = new CustomersController;
+		// added version for inserting version in this table by shankhpal on 08/06/2023
+		$current_version = $CustomersController->Customfunctions->currentVersion($customer_id);
+
+		$packer_id = htmlentities($_POST['packer_id'], ENT_QUOTES);
+		$indent = htmlentities($_POST['indent'], ENT_QUOTES);
+		$supplied = htmlentities($_POST['supplied'], ENT_QUOTES);
+		$balance = htmlentities($_POST['balance'], ENT_QUOTES);
+		$tbl_name = htmlentities($_POST['tbl_name'], ENT_QUOTES);
+
+		$save_details_result = $this->DmiRtiPackerDetails->savePackageingDetails($packer_id,$indent,$supplied,$balance,$tbl_name,$current_version);// call custome method from model
+		$added_packaging_details = $this->DmiRtiPackerDetails->packagingDetails();
+
+		$this->Set('section_form_details',$added_packaging_details);
+		
+		$this->render('/element/rti_addmore_element/rti_addmore_element_pp');
+	}
+
+		
+	// edit Sample Id
+	// @AUTHOR : SHANKHPAL SHENDE
+	// Description : To edit sample details created for Routine Inspection flow  (RTI)
+	// DATE : 28/12/2022 
+		
+	public function editSampleId() {
+
+		$this->autoRender = false;
+		$this->loadModel('DmiCheckSamples');
+
+		$customer_id = $this->Customfunctions->sessionCustomerID();
+		$firm_type = $this->Customfunctions->firmType($customer_id);
+
+		if ($this->Session->read('edit_sample_id')==null) {
+
+			$edit_sample_id = $_POST['edit_sample_id'];
+			$this->Session->write('edit_sample_id',$edit_sample_id);
+
+		} elseif ($_POST['edit_sample_id'] != $this->Session->read('edit_sample_id')) {
+
+			if ($_POST['edit_sample_id'] == '') {
+				$save_sample_id = $_POST['save_sample_id'];
+			} else {
+
+				$edit_sample_id = $_POST['edit_sample_id'];
+				$this->Session->write('edit_sample_id',$edit_sample_id);
+			}
+		}
+
+		if ($this->Session->read('edit_sample_id') != null) {
+
+			if (!empty($edit_sample_id)) {
+
+				$find_sample_details = $this->DmiCheckSamples->find('all',array('conditions'=>array('id IS'=>$edit_sample_id)))->first();
+				
+				$this->set('find_sample_details',$find_sample_details);
+			}
+		}
+
+		if (!empty($save_sample_id)) {
+
+			$record_id = $this->Session->read('edit_sample_id');
+			$commodity_name = htmlentities($_POST['commodity_name'], ENT_QUOTES);
+			$pack_size = htmlentities($_POST['pack_size'], ENT_QUOTES);
+			$lot_no = htmlentities($_POST['lot_no'], ENT_QUOTES);
+			$date_of_packing = htmlentities($_POST['date_of_packing'], ENT_QUOTES);
+			$best_before = htmlentities($_POST['best_before'], ENT_QUOTES);
+			$replica_si_no = htmlentities($_POST['replica_si_no'], ENT_QUOTES);
+
+			$save_details_result = $this->DmiCheckSamples->editSampleDetails($record_id,$commodity_name,$pack_size,$lot_no,$date_of_packing,$best_before,$replica_si_no);// call custome method from model
+			$this->Session->delete('edit_sample_id');
+		}
+
+		$added_sample_details = $this->DmiCheckSamples->RoutineInspectionSampleDetails();
+
+		$this->Set('section_form_details',$added_sample_details);
 	
+		$this->render('/element/rti_addmore_element/rti_addmore_element');
+		
+	}
+
+
+		
+	// Delete Sample Id
+	// @AUTHOR : SHANKHPAL SHENDE
+	// Description : created for Routine Inspection flow  (RTI)
+	// DATE : 28/12/2022 
+
+	public function deleteSampleId() {
+		
+		$this->Session->delete('edit_sample_id');
+		$this->loadModel('DmiCheckSamples');
+
+		$customer_id = $this->Customfunctions->sessionCustomerID();
+		$firm_type = $this->Customfunctions->firmType($customer_id);
+
+		//$record_id = $id;
+		$record_id = $_POST['delete_sample_id'];
+		$sample_delete_result = $this->DmiCheckSamples->deleteSampleDetails($record_id);// call to custome function from model
+   	
+		$added_sample_details = $this->DmiCheckSamples->RoutineInspectionSampleDetails();
+		$this->Set('section_form_details',$added_sample_details);
+		
+		$this->render('/element/rti_addmore_element/rti_addmore_element');
+		
+
+	}
+
+
+
+
+	// EDIT PACKER ID
+	// @AUTHOR : SHANKHPAL SHENDE
+	// DESC : created for Routine Inspection flow  (RTI)
+	// DATE : 28/12/2022 
+		
+	public function editPackId() {
+
+		$this->autoRender = false;
+		$this->loadModel('DmiRtiPackerDetails');
+		$this->loadModel('DmiAllTblsDetails');
+		
+
+		$customer_id = $this->Customfunctions->sessionCustomerID();
+
+		if ($this->Session->read('edit_pack_id')==null) {
+
+			$edit_pack_id = $_POST['edit_pack_id'];
+			
+			$this->Session->write('edit_pack_id',$edit_pack_id);
+
+		} elseif ($_POST['edit_pack_id'] != $this->Session->read('edit_pack_id')) {
+
+			if ($_POST['edit_pack_id'] == '') {
+				$save_packer_id = $_POST['save_packer_id'];
+			} else {
+				$edit_pack_id = $_POST['edit_pack_id'];
+				$this->Session->write('edit_pack_id',$edit_pack_id);
+			}
+		}
+
+		if ($this->Session->read('edit_pack_id') != null) {
+
+			if (!empty($edit_pack_id)) {
+
+				$find_packer_details = $this->DmiRtiPackerDetails->find('all',array('conditions'=>array('id IS'=>$edit_pack_id)))->first();
+
+				$packer_id = $find_packer_details['packer_id'];
+
+				$added_tbl_list = $this->DmiAllTblsDetails->find('list',array('keyField'=>'tbl_name','valueField'=>'tbl_name', 'conditions'=>array('customer_id IN'=>$packer_id)))->toArray();
+
+				$this->set('find_packer_details',$find_packer_details);
+				$this->set('added_tbl_list',$added_tbl_list);
+
+			}
+		}
+
+		if (!empty($save_packer_id)) {
+
+			$record_id = $this->Session->read('edit_pack_id');
+			
+			$packer_id = htmlentities($_POST['packer_id'], ENT_QUOTES);
+			$indent = htmlentities($_POST['indent'], ENT_QUOTES);
+			$supplied = htmlentities($_POST['supplied'], ENT_QUOTES);
+			$balance = htmlentities($_POST['balance'], ENT_QUOTES);
+			$tbl = htmlentities($_POST['tbl'], ENT_QUOTES);
+
+			$save_details_result = $this->DmiRtiPackerDetails->editPackerDetails($record_id,$packer_id,$indent,$supplied,$balance,$tbl);// call custome method from model
+			$this->Session->delete('edit_pack_id');
+		}
+
+		$added_packer_details = $this->DmiRtiPackerDetails->packagingDetails();
+
+		$this->Set('section_form_details',$added_packer_details);
+		
+		$this->render('/element/rti_addmore_element/rti_addmore_element_pp');
+		
+	}
+
+
+	
+	// delete Pack Id
+	// @AUTHOR : SHANKHPAL SHENDE
+	// DESC : created for Routine Inspection flow  (RTI)
+	// DATE : 28/12/2022 
+
+	public function deletePackId() {
+	
+		$this->Session->delete('edit_pack_id');
+		$this->loadModel('DmiRtiPackerDetails');
+		$customer_id = $this->Customfunctions->sessionCustomerID();
+		$record_id = $_POST['delete_pack_id'];
+		$packer_delete_result = $this->DmiRtiPackerDetails->deletePackDetails($record_id);// call to custome function from model
+		$added_packer_details = $this->DmiRtiPackerDetails->packagingDetails();
+		$this->Set('section_form_details',$added_packer_details);
+		
+		$this->render('/element/rti_addmore_element/rti_addmore_element_pp');
+
+	}
+
+
+
+	// GET Packer id wise tbl details
+	// @AUTHOR : SHANKHPAL SHENDE
+	// DESC : created for Routine Inspection flow  (RTI)
+	// DATE : 28/12/2022 
+
+	public function getPackerIdWiseTbl(){
+			
+		$this->autoRender = false;
+		
+		$packer_id = $_POST['packer_id'];
+		$this->loadModel('DmiFirms');
+		$this->loadModel('DmiAllTblsDetails');
+
+		// updated query by shankhpal shende on 19/05/2023
+		$tbl_list = $this->DmiAllTblsDetails->find('list',array('keyField'=>'tbl_code','valueField'=>'tbl_name', 'conditions'=>array('customer_id IN'=>$packer_id,'delete_status IS NULL')))->toList();
+
+		if(!empty($tbl_list)){
+			$result = array('tbl_name'=>$tbl_list);
+			echo '~'.json_encode($result).'~';
+		}else{
+			echo '~No data~';
+		}
+		exit;
+
+	}
 	/**
 	 * Function Created for  pending work that has remained 
 	 *	incomplete for more than 5 days. 
