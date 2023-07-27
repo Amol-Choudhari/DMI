@@ -252,7 +252,8 @@
 				if($for_status == 'pending') { 
 					$check_final_reported = $final_submit_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id,'status'=>'approved','OR'=>array('current_level IN'=>array('level_2','level_3')),$grantDateCondition)))->first();		
 					
-					if (empty($check_final_reported)) {
+					//added $appl_type_id = 10 for routine inspection list by shankhpal shende on 18/05/2023
+					if (empty($check_final_reported) || $appl_type_id == '10') {
 						$creat_array = $each_alloc['modified'];
 					}
 				}
@@ -1088,6 +1089,13 @@
 			$appl_edit_link = '../scrutiny/form_scrutiny_fetch_id/'.$firm_table_id.'/edit/'.$appl_type_id;
 			$comm_with_email = null;
 	
+			//default set to 1 to open application sections added by shankhapal shende on 30/06/2023
+			//for module RTI
+			
+			if($appl_type_id == 10){
+				//Added default 1 for opening application when Application type =10
+				$appl_view_link = '../scrutiny/form_scrutiny_fetch_id/'.$firm_table_id.'/view/1';
+			}
 			//extra conditional stuff
 			if($for_level=='pao'){
 				$comm_with = 'Applicant';

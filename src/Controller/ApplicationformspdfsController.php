@@ -253,6 +253,8 @@ class ApplicationformspdfsController extends AppController{
 		
 		}elseif($application_type==8){ //added by shankhpal shende on 15-11-2022
 			$pdfPrefix = 'ADP-';
+		}elseif($application_type==10){ //For Routine Inspection Module (RTI)
+			$pdfPrefix = 'RTI-';
 		}
 		
 		$rearranged_id = 'I-'.$pdfPrefix.$split_customer_id[0].'-'.$split_customer_id[1].'-'.$split_customer_id[2].'-'.$split_customer_id[3];
@@ -3022,6 +3024,295 @@ class ApplicationformspdfsController extends AppController{
 
 		$this->redirect(array('controller'=>'hoinspections','action'=>'grantCertificatesList'));
 
+	}
+	// Description : To generate the Report PDF for CA Firm for the flow of RTI.
+	// @Author : Shankhpal Shende
+	// #Date : 29/12/2022
+	// Note : For Routine Inspection (RTI)
+	
+	
+	// Description : Updated caRiReport function added new model name => DmiRtiCaPackerDetails
+	// @Author : Shankhpal Shende
+	// #Date : 12/05/2023
+	// Note : For Routine Inspection (RTI)
+
+
+	public function caRiReportPdf(){
+
+	  
+		$this->loadModel('DmiRtiCaPackerDetails');	 // changese modelname 13-05-2023
+		$this->loadModel('DmiFirms');	
+		$this->loadModel('DmiGrantCertificatesPdfs');
+		$this->loadModel('MCommodity');
+		$this->loadModel('DmiCaPpLabMapings');
+		$this->loadModel('DmiChemistRegistrations');
+		$this->loadModel('DmiCheckSamples');
+		$this->loadModel('DmiDistricts');
+		$this->loadModel('DmiStates');
+		
+
+		$customer_id = $this->Session->read('customer_id');
+		$this->set('customer_id',$customer_id);
+
+		// condition updated fetch last inserted record on 13/07/2023-shankhpal
+		$rti_ca_data = $this->DmiRtiCaPackerDetails->find('all', [
+    	'conditions' => ['customer_id' => $customer_id],
+    	'order' => ['id' => 'DESC'],
+    	'limit' => 1
+		])->first();
+		
+		$this->set('rti_ca_data',$rti_ca_data);
+
+		// data from DMI firm Table
+		$fetch_customer_firm_data = $this->DmiFirms->find('all',array('conditions'=>array('customer_id IS'=>$customer_id)))->first();
+		$customer_firm_data = $fetch_customer_firm_data;
+		$this->set('customer_firm_data',$customer_firm_data);
+
+		$pdf_date = date('d-m-Y');
+		$this->set('pdf_date',$pdf_date);
+
+		$fetch_district_name = $this->DmiDistricts->find('all',array('fields'=>'district_name','conditions'=>array('id IS'=>$customer_firm_data['district'], 'OR'=>array('delete_status IS NULL','delete_status ='=>'no'))))->first();
+		$firm_district_name = $fetch_district_name['district_name'];
+		$this->set('firm_district_name',$firm_district_name);
+
+		$fetch_state_name = $this->DmiStates->find('all',array('fields'=>'state_name','conditions'=>array('id IS'=>$customer_firm_data['state'], 'OR'=>array('delete_status IS NULL','delete_status ='=>'no'))))->first();
+		$firm_state_name = $fetch_state_name['state_name'];
+		$this->set('firm_state_name',$firm_state_name);
+
+		// Fetch data from DMI firm Table
+		$firm_details = $this->DmiFirms->firmDetails($customer_id);
+		$this->set('firm_details',$firm_details);	
+
+		$get_last_grant_date = $this->DmiGrantCertificatesPdfs->find('all',array('conditions'=>array('customer_id IS'=>$customer_id),'order'=>array('id desc')))->first();
+		$last_grant_date = $get_last_grant_date['date'];
+
+		$CustomersController = new CustomersController;
+		$certificate_valid_upto = $CustomersController->Customfunctions->getCertificateValidUptoDate($customer_id,$last_grant_date);
+		$this->set('certificate_valid_upto',$certificate_valid_upto);	
+
+		$added_firms = $this->DmiFirms->find('all',array('conditions'=>array('customer_id IS'=>$customer_id)))->first();
+
+		//taking id of multiple sub commodities	to show names in list	
+		$sub_comm_id = explode(',',(string) $added_firms['sub_commodity']); #For Deprecations
+
+		$sub_commodity_value = $this->MCommodity->find('list',array('valueField'=>'commodity_name', 'conditions'=>array('commodity_code IN'=>$sub_comm_id)))->toList();
+		$this->set('sub_commodity_value',$sub_commodity_value);
+		
+		$attached_lab = $this->DmiCaPpLabMapings->find('list',array('keyField'=>'id','valueField'=>'lab_id','conditions'=>array('customer_id IS'=>$customer_id),'order'=>'id asc'))->toList();
+		
+		$lab_list = [];
+		if(!empty($attached_lab)){
+			$lab_list = $this->DmiFirms->find('list',array('keyField'=>'id','valueField'=>'firm_name','conditions'=>array('customer_id like'=>'%'.'/3/'.'%','delete_status IS NULL','id IN'=>$attached_lab),'order'=>'firm_name asc'))->toArray();
+		}
+
+		$this->set('lab_list',$lab_list);
+
+		$attached_pp = $this->DmiCaPpLabMapings->find('list',array('keyField'=>'id','valueField'=>'pp_id','conditions'=>array('customer_id IS'=>$customer_id),'order'=>'id asc'))->toList();
+
+		$printers_list = [];
+		if(!empty($attached_pp)){
+			$printers_list = $this->DmiFirms->find('list',array('keyField'=>'id','valueField'=>'firm_name','conditions'=>array('customer_id like'=>'%'.'/2/'.'%','delete_status IS Null','id IN'=>$attached_pp),'order'=>'firm_name asc'))->toArray();
+		}
+		$this->set('printers_list',$printers_list);
+
+		//to get registerd chemist
+		$self_registered_chemist = $this->DmiChemistRegistrations->find('all',array('conditions'=>array('created_by IS'=>$customer_id)))->toArray();
+		$this->set('self_registered_chemist',$self_registered_chemist);
+
+		//get current version
+		$current_version = $CustomersController->Customfunctions->currentVersion($customer_id);
+
+		// to get added check sample table details
+		$added_sample_details = $this->DmiCheckSamples->find('all', array('conditions'=>array('customer_id IS'=>$customer_id,'delete_status IS NULL','version'=>$current_version),'order'=>'id'))->toArray();
+		$this->set('added_sample_details',$added_sample_details);
+
+		$this->generateReportPdf('/Applicationformspdfs/rtiCertificateForCa');
+		$this->redirect(array('controller'=>'dashboard','action'=>'home'));
+
+	}
+
+
+
+
+	// Description : To generate the Report PDF for printing press for the flow of RTI.
+	// @Author : Shankhpal Shende
+	// #Date : 29/12/2022
+	// Note : For Routine Inspection (RTI)
+
+	// Description : Updated the Report PDF for printing press for the flow of RTI.
+	// @Author : Shankhpal Shende
+	// #Date : 23/05/2023
+	// Note : For Routine Inspection (RTI)
+
+	public function ppRiReportPdf(){
+
+
+		$this->loadModel('DmiRoutineInspectionPpReports');
+		$this->loadModel('DmiFirms');
+		$this->loadModel('DmiGrantCertificatesPdfs');
+		$this->loadModel('DmiAllTblsDetails');
+		$this->loadModel('MCommodity');
+
+		$customer_id = $this->Session->read('customer_id');
+		$this->set('customer_id',$customer_id);
+
+		// condition updated fetch last inserted record on 13/07/2023-shankhpal
+		$rti_pp_data = $this->DmiRoutineInspectionPpReports->find('all', [
+    	'conditions' => ['customer_id' => $customer_id],
+    	'order' => ['id' => 'DESC'],
+    	'limit' => 1
+		])->first();
+	
+		$this->set('rti_pp_data',$rti_pp_data);
+
+		$firm_details = $this->DmiFirms->firmDetails($customer_id);
+		$this->set('firm_details',$firm_details);	
+
+		$conn = ConnectionManager::get('default');
+
+		$users = "SELECT DISTINCT map.customer_id, dff.firm_name,dff.sub_commodity
+				FROM dmi_firms AS df
+				INNER JOIN dmi_ca_pp_lab_mapings AS map ON map.pp_id=df.id::varchar
+				INNER JOIN dmi_firms AS dff ON dff.customer_id = map.customer_id
+				WHERE df.customer_id = '$customer_id' AND map.pp_id IS NOT NULL AND map.map_type = 'pp'";		
+
+		$q = $conn->execute($users);
+
+		$all_packers_records = $q->fetchAll('assoc');
+		$this->loadModel('MCommodity');
+		$MCommodity = TableRegistry::getTableLocator()->get('MCommodity');
+
+			$i=0;
+				$all_packers_value=array();
+			
+				foreach($all_packers_records as $value) // use for show list of CA id's
+				{
+						$packers_customer_id = $value['customer_id'];
+						$all_packers_value[$i]['customer_id'] = $value['customer_id'];
+						$all_packers_value[$i]['firm_name'] = $value['firm_name'];
+					
+						$Dmi_grant_certificates_pdfs = TableRegistry::getTableLocator()->get('DmiGrantCertificatesPdfs');
+						$get_last_grant_date = $Dmi_grant_certificates_pdfs->find('all',array('conditions'=>array('customer_id IS'=>$value['customer_id']),'order'=>array('id desc')))->first();
+				
+						$last_grant_date = $get_last_grant_date['date'];
+					
+						$CustomersController = new CustomersController;
+						$certificate_valid_upto = $CustomersController->Customfunctions->getCertificateValidUptoDate($value['customer_id'],$last_grant_date);
+				
+						$all_packers_value[$i]['validupto'] = $certificate_valid_upto;
+					
+						$DmiAllTblsDetails = TableRegistry::getTableLocator()->get('DmiAllTblsDetails');
+						// query updated by shankhpal on 19/05/2023
+						$tbl_list = $DmiAllTblsDetails->find('list',array('keyField'=>'id','valueField'=>'tbl_name', 'conditions'=>array('customer_id IN'=>$packers_customer_id,'delete_status IS NULL')))->toList();
+
+						$all_packers_value[$i]['tbl_name'] = $tbl_list;
+					
+						$sub_commodity_value = $MCommodity->find('list',array('keyField'=>'commodity_code','valueField'=>'commodity_name', 'conditions'=>array('commodity_code IN'=>explode(',',$value['sub_commodity']))))->toList();
+						$all_packers_value[$i]['sub_commodity'] = $sub_commodity_value;
+
+						$i=$i+1;
+				}
+
+		$this->loadModel('DmiRtiPackerDetails');
+		$this->loadModel('DmiFirms'); // added by shankhpal on 23/05/2023 for to office address
+		$added_packers_details = $this->DmiRtiPackerDetails->find('all', array('conditions'=>array('customer_id IS'=>$customer_id,'delete_status IS NULL'),'order'=>'id'))->toArray();
+		
+		$firm_data = $this->DmiFirms->find('all',array('keyField'=>'commodity_code','valueField'=>'commodity_name', 'conditions'=>array('customer_id IN'=> $customer_id)))->first(); // updated query toArray to first on 19/05/2023
+
+		$registered_office_address = $firm_data['street_address']; // added for Registered office address by shankhpal 19/05/2023
+
+		// load model DmiPrintingPremisesProfiles on 19/05/2023
+		$this->loadModel('DmiPrintingPremisesProfiles');
+		$premises_data = $this->DmiPrintingPremisesProfiles->find('all', array('valueField'=>'street_address', 'conditions'=>array('customer_id IS'=>$customer_id)))->first();
+		
+		$printing_premises_address = $premises_data['street_address'];   //to get printing_premises_address
+
+		$this->loadModel('DmiPackingTypes');
+		$added_firms = $this->DmiFirms->find('all',array('conditions'=>array('customer_id IS'=>$customer_id)))->toArray();	
+	
+		$added_firm_field = $added_firms[0];
+		//taking id of multiple Packaging Materials types to show names in list	
+		$packaging_type_id = explode(',',(string) $added_firm_field['packaging_materials']); #For Deprecations
+
+		$packaging_materials_value = $this->DmiPackingTypes->find('list',array('valueField'=>'packing_type', 'conditions'=>array('id IN'=>$packaging_type_id)))->toList();
+   
+		$this->set('added_packers_details',$added_packers_details);	
+		$this->set('sub_commodity_value',$sub_commodity_value);	
+		$this->set('all_packers_value',$all_packers_value);	
+		$this->set('registered_office_address',$registered_office_address);
+		$this->set('printing_premises_address',$printing_premises_address);
+		$this->set('packaging_materials_value',$packaging_materials_value);
+		$this->generateReportPdf('/Applicationformspdfs/rtiCertificateForPp'); 
+		$this->redirect(array('controller'=>'dashboard','action'=>'home'));
+	
+
+	}
+
+
+
+	// Description : To generate the Report PDF for lab for the flow of RTI.
+	// @Author : Shankhpal Shende
+	// #Date : 29/12/2022
+	// Note : For Routine Inspection (RTI)
+
+	public function labRiReportPdf(){
+
+		#Load Models
+		// $this->loadModel('DmiRoutineInspectionLabReports');  // Commented by shankhapl on 26/05/2023 for replce of new model name
+		$this->loadModel('DmiRtiLaboratoryDetails'); // added new table for rti module on 26/05/2023
+		$this->loadModel('DmiFirms');
+		$this->loadModel('MCommodity');
+
+		$customer_id = $this->Session->read('customer_id');
+		$this->set('customer_id',$customer_id);
+
+		// condition updated fetch last inserted record on 13/07/2023-shankhpal
+		$rti_lab_data = $this->DmiRtiLaboratoryDetails->find('all', [
+    	'conditions' => ['customer_id' => $customer_id],
+    	'order' => ['id' => 'DESC'],
+    	'limit' => 1
+		])->first();
+		$this->set('rti_lab_data',$rti_lab_data);
+
+		$firm_details = $this->DmiFirms->firmDetails($customer_id);
+		$this->set('firm_details',$firm_details);	
+
+		$added_firms = $this->DmiFirms->find('all',array('conditions'=>array('customer_id IS'=>$customer_id)))->first();
+		//taking id of multiple sub commodities	to show names in list	
+		$sub_comm_id = explode(',',(string) $added_firms['sub_commodity']); #For Deprecations
+
+		$sub_commodity_value = $this->MCommodity->find('list',array('valueField'=>'commodity_name', 'conditions'=>array('commodity_code IN'=>$sub_comm_id)))->toList();
+		$this->set('sub_commodity_value',$sub_commodity_value);
+
+		$conn = ConnectionManager::get('default');
+
+    $approved_chemist = "SELECT  cr.chemist_fname, cr.chemist_lname, cr.chemist_id,cr. created_by
+    FROM dmi_chemist_registrations AS cr
+    INNER JOIN dmi_chemist_final_submits AS cfs ON cfs.customer_id = cr.chemist_id
+    WHERE cr.created_by = '$customer_id' AND 
+    (((cr.is_training_completed IS NULL OR cr.is_training_completed='yes') AND status = 'approved' AND current_level = 'level_1')
+    OR (cr.is_training_completed='no' AND status = 'approved' AND current_level = 'level_3'))";
+
+    $q = $conn->execute($approved_chemist);
+
+    $all_approved_chemist = $q->fetchAll('assoc');
+		 $chemist_full_name = [];
+			
+    if (!empty($all_approved_chemist)) {
+      $chemist_full_name = [];
+      foreach ($all_approved_chemist as $each_chemist) {
+          $full_name = $each_chemist['chemist_fname'] . ' ' . $each_chemist['chemist_lname'];
+          $chemist_full_name[$full_name] = $full_name;
+      }
+    }else{
+        $chemist_full_name = [];
+        // Add other manual options if needed
+      
+    }
+		$this->set('chemist_full_name',$chemist_full_name);
+		$this->generateReportPdf('/Applicationformspdfs/rtiCertificateForLab'); 
+		$this->redirect(array('controller'=>'dashboard','action'=>'home'));
+	
 	}
 
 
