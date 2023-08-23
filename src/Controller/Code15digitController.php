@@ -1099,6 +1099,11 @@ class Code15digitController extends AppController {
 
 		$pdf_date = date('d-m-Y');
 
+		//added code to get validity date for next 3 months from issue
+		//on 21-08-2023 by Amol
+		$validUptoDate = date('d/m/Y', strtotime("+3 months", strtotime($pdf_date)));
+		$this->set('validUptoDate',$validUptoDate);
+
 		//added by shankhpal shende on 14/10/2022 for implimenting QR code for replica EsignedChemist
 		$data = [$chemist_name,$firm_details['customer_id'],$firm_details['firm_name'],$pdf_date,$region];
 	//	$data = [$chemist_name,$firm_details['firm_name']];
@@ -1239,7 +1244,13 @@ class Code15digitController extends AppController {
 			//update allotment status to 1 in replica allotment table
 			$this->loadModel('Dmi15DigitAllotmentDetails');
 			$date = date('Y-m-d H:i:s');
-			$this->Dmi15DigitAllotmentDetails->updateAll(array('allot_status'=>"1",'modified'=>"$date",'version'=>"$current_pdf_version"),array('customer_id IS'=>$customer_id,'allot_status IS Null','delete_status IS Null'));
+
+			//added code to get validity date for next 3 months from issue
+			//on 21-08-2023 by Amol
+			$validUptoDate = date('Y-m-d', strtotime("+3 months", strtotime($date)));
+
+			//updated query with new field "valid_upto" on 21-08-2023 by Amol
+		$this->Dmi15DigitAllotmentDetails->updateAll(array('allot_status'=>"1",'modified'=>"$date",'version'=>"$current_pdf_version"/*,'valid_upto'=>"$validUptoDate"*/),array('customer_id IS'=>$customer_id,'allot_status IS Null','delete_status IS Null'));
 		
 			
 		}

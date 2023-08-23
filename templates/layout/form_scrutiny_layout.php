@@ -59,6 +59,9 @@
 			echo $this->Html->script('dataTables.responsive.min');
 			echo $this->Html->script('responsive.bootstrap.min');
 			
+			echo $this->Html->script('Validations/surrender_form_validations');
+
+			
 		?>
 	
 		<title>Directorate of Marketing & Inspection</title>

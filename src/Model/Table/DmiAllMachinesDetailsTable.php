@@ -71,12 +71,16 @@
 			{
 				
 				$machine_type_value = $each_machine['machine_type'];
-				$show_machine_type[$i] = $machines_types[$machine_type_value];
-				//print_r($smachine_types); exit;
-				$i=$i+1;	
+				
+				//added !empty cond. on 21-08-2023 by Amol, to avoid error messages
+				if(!empty($machines_types[$machine_type_value])){
+					$show_machine_type[$i] = $machines_types[$machine_type_value];
+									 
+					$i=$i+1;
+				}
+									   
+					
 			}
-			//print_r($show_machine_type); exit;
-
 			return array($machines_types,$show_machine_type,$added_machines_details);
 		}
 		

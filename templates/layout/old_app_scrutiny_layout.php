@@ -55,6 +55,8 @@
 				   echo $this->Html->script('auth_old_processed_validations');
 				   echo $this->Html->script('table_filter');
 				   echo $this->Html->script('jquery-confirm.min');
+				   echo $this->Html->script('Validations/surrender_form_validations');
+
 				
 			?>
 

@@ -72,7 +72,8 @@
         </tr>   
                     
         <tr>
-            <td><br>With reference to your letter on <?php echo $appl_date; ?>, on the subject cited above the E-Code no. <b><?php echo $firm_details['e_code']; ?></b> is allotted for the printing of Agmark replica.<!-- in lieu of Agmark labels on ……….. for packing………… 
+            <td><br>With reference to your letter on <?php echo $appl_date; ?>, on the subject cited above the E-Code no. <b><?php echo $firm_details['e_code']; ?></b> is allotted for the printing of Agmark replica.
+            <!--<br />The following replica E-code is valid till date <?php echo $validUptoDate; ?>.--><!-- in lieu of Agmark labels on ……….. for packing………… 
                     for the following pack sizes as desired by you. TBL………--></td>
         </tr>
               

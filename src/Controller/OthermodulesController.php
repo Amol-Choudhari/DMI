@@ -1591,6 +1591,260 @@ class OthermodulesController extends AppController{
 	}
 	
 	
+	
+
+	// Author : Shankhpal Shende
+	// Description : This function is created for display list of records whose status approved and matched
+	// Date : 08-02-2023
+	// Note : For Routine Inspection (RTI)
+
+	// Function updated on 12/06/2023 by shankhpal shende
+	public function routineInspectionList(){
+
+		$this->viewBuilder()->setLayout('admin_dashboard');
+		$this->loadModel('DmiRtiAllocations');
+		$this->loadModel('DmiRtiFinalReports');
+		$this->loadModel('DmiRoutineInspectionPeriod');
+		$this->loadModel('DmiFirms');
+		$this->loadModel('DmiFlowWiseTablesLists');
+		$this->loadModel('DmiRoOffices');
+		$conn = ConnectionManager::get('default');
+
+		$this->Session->write('application_type',10);
+		$username = $this->Session->read('username');
+		$application_type = $this->Session->read('application_type');
+		$customer_id = $this->Session->read('customer_id');
+		
+		$get_period = $conn->execute("SELECT periods.* FROM dmi_routine_inspection_period AS periods")->fetchAll('assoc');
+
+		$period_ca = null;
+		$period_lab = null;
+		$period_pp = null;
+
+		if (!empty($get_period[0]['period'])) {
+				$period_ca = $get_period[0]['period'];
+		}
+		if (!empty($get_period[1]['period'])) {
+				$period_lab = $get_period[1]['period'];
+		}
+		if (!empty($get_period[2]['period'])) {
+				$period_pp = $get_period[2]['period'];
+		}
+
+		$get_short_codes = $this->DmiRoOffices->find('list',array('valueField'=>'short_code','conditions'=>array('ro_email_id IS'=>$username)))->toArray(); //get RO/SO Incharge details
+	
+		$conditions = ['ca' => '','pp' => '','lab' => ''];
+
+		$n = 1;
+		foreach ($get_short_codes as $key => $value) {
+			if ($key != (count($get_short_codes) - 1)) {
+					$separator = ($n != 1) ? ' OR ' : '';
+					$conditions['ca'] .= $separator . "customer_id like '%/1/$value/%'";
+					$conditions['pp'] .= $separator . "customer_id like '%/2/$value/%'";
+					$conditions['lab'] .= $separator . "customer_id like '%/3/$value/%'";
+					$n++;
+			}
+		}
+		
+		$condition_ca = $conditions['ca'];
+		$condition_pp = $conditions['pp'];
+		$condition_lab = $conditions['lab'];
+		
+		$to_date = date('Y-m-d H:i:s');
+		//dates between to fetch records
+		$from_date_ca = date("Y-m-d H:i:s",strtotime("-$period_ca month"));
+		$from_date_pp = date("Y-m-d H:i:s",strtotime("-$period_pp month"));
+		$from_date_lab = date("Y-m-d H:i:s",strtotime("-$period_lab month"));
+
+		$conditions = [
+				'OR' => [
+						$condition_ca,
+						$condition_pp,
+						$condition_lab,
+				],
+				'AND' => [
+						[
+								'OR' => [
+										'AND' => [
+												'date(created) >=' => $from_date_ca,
+												'date(created) <=' => $to_date,
+										],
+										'AND' => [
+												'date(created) >=' => $from_date_pp,
+												'date(created) <=' => $to_date,
+										],
+										'AND' => [
+												'date(created) >=' => $from_date_lab,
+												'date(created) <=' => $to_date,
+										],
+								],
+						],
+				],
+		];
+		
+		$results = $this->DmiRtiAllocations->find('list', [
+				'keyField' => 'id',
+				'valueField' => 'customer_id',
+				'conditions' => $conditions,
+				'order' => 'id desc',
+		])->toArray();
+
+		// Separate the results based on allocation type
+		$list_array_ca = [];
+		$list_array_pp = [];
+		$list_array_lab = [];
+			
+		foreach ($results as $key => $value) {
+			if (strpos($value, '/1/') !== false) {
+					$list_array_ca[$key] = $value;
+			} elseif (strpos($value, '/2/') !== false) {
+					$list_array_pp[$key] = $value;
+			} elseif (strpos($value, '/3/') !== false) {
+					$list_array_lab[$key] = $value;
+			}
+		}
+
+		// to get array list for allocated ca application 
+		$list_array_ca = $this->DmiRtiAllocations->find('list',array('keyField'=>'id','valueField'=>'customer_id','conditions'=>array($condition_ca, array('date(created) >=' => $from_date_ca, 'date(created) <=' =>$to_date)),'order'=>'id desc'))->toArray();
+		
+		// to get array list for allocated pp application 
+		$list_array_pp = $this->DmiRtiAllocations->find('list',array('keyField'=>'id','valueField'=>'customer_id','conditions'=>array($condition_pp,array('date(created) >=' => $from_date_pp, 'date(created) <=' =>$to_date)),'order'=>'id desc'))->toArray();
+		
+		// to get array list for allocated lab application 
+		$list_array_lab = $this->DmiRtiAllocations->find('list',array('keyField'=>'id','valueField'=>'customer_id','conditions'=>array($condition_lab,array('date(created) >=' => $from_date_lab, 'date(created) <=' =>$to_date)),'order'=>'id desc'))->toArray();
+
+		
+			
+		//added by shankhpal for approved list of ca 16/05/2023
+		$get_rti_approved_list_for_ca = [];
+		if(!empty($list_array_ca)){
+					$get_rti_approved_list_for_ca = $this->DmiRtiFinalReports->find('all',array('conditions'=>array('customer_id IN'=>$list_array_ca,'status IN'=>'approved','current_level'=>'level_3'),'order'=>'id desc'))->toArray();
+		}
+		
+		$get_rti_approved_list_for_pp = [];
+
+		if(!empty($list_array_pp)){
+			$get_rti_approved_list_for_pp = $this->DmiRtiFinalReports->find('all',array('conditions'=>array('customer_id IN'=>$list_array_pp,'status IN'=>'approved','current_level'=>'level_3'),'order'=>'id desc'))->toArray();
+		}
+
+		//added by shankhpal for approved list of lab 16/05/2023
+		$get_rti_approved_list_for_lab = [];
+		if(!empty($list_array_lab)){
+				$get_rti_approved_list_for_lab = $this->DmiRtiFinalReports->find('all',array('conditions'=>array('customer_id IN'=>$list_array_lab,'status IN'=>'approved','current_level'=>'level_3'),'order'=>'id desc'))->toArray();
+		}
+
+		$flow_wise_table = $this->DmiFlowWiseTablesLists->find('all',array('conditions'=>array('application_type IS'=>$application_type)))->first();
+	
+		$report_pdf_table = $flow_wise_table['DmiRtiReportPdfRecords'];
+		$this->loadModel('DmiRtiReportPdfRecords');
+			
+		$appl_array_ca = array();
+		$i=0;
+		foreach($get_rti_approved_list_for_ca as $each){	
+			
+			$customer_id = $each['customer_id'];
+			$form_type = $this->Customfunctions->checkApplicantFormType($customer_id);
+			
+			$report_pdf_field = 'pdf_file';
+			$get_report_pdf = $this->DmiRtiReportPdfRecords->find('all',array('conditions'=>array('customer_id'=>$customer_id),'order'=>'id desc'))->first();
+			
+					
+			$report_pdf = '';
+			$pdf_version_ca = '';
+			if(!empty($get_report_pdf)){
+				$report_pdf = $get_report_pdf[$report_pdf_field];
+				$pdf_version_ca = $get_report_pdf['pdf_version'];
+			}
+			//get firm details
+			$firm_details = $this->DmiFirms->firmDetails($customer_id);
+			$firm_name = $firm_details['firm_name'];					
+			$firm_table_id = $firm_details['id'];
+
+			$report_link = '../inspections/routine_inspection_report_fetch_id/'.$firm_details['id'].'/view/'.$application_type.'/yes';
+
+			$appl_array_ca[$i]['customer_id'] = $customer_id.'-'.$form_type;
+			$appl_array_ca[$i]['firm_name'] = $firm_name;
+			$appl_array_ca[$i]['on_date'] = $each['created'];
+			$appl_array_ca[$i]['report_pdf'] = $report_pdf;
+			$appl_array_ca[$i]['report_link'] = $report_link;
+			$appl_array_ca[$i]['pdf_version'] = $pdf_version_ca;
+			
+			$i=$i+1;
+		}
+			
+		$appl_array_pp = array();
+		$i=0;
+		
+		foreach($get_rti_approved_list_for_pp as $each){	
+			
+			$customer_id = $each['customer_id'];
+			$form_type = $this->Customfunctions->checkApplicantFormType($customer_id);
+			$report_pdf_field = 'pdf_file';
+			$get_report_pdf = $this->DmiRtiReportPdfRecords->find('all',array('conditions'=>array('customer_id'=>$customer_id),'order'=>'id desc'))->first();
+					
+			$pdf_version_pp = '';
+			$report_pdf = '';
+			if(!empty($get_report_pdf)){
+				$report_pdf = $get_report_pdf[$report_pdf_field];
+				$pdf_version_pp = $get_report_pdf['pdf_version'];
+				
+			}
+			//get firm details
+			$firm_details = $this->DmiFirms->firmDetails($customer_id);
+			$firm_name = $firm_details['firm_name'];					
+			$firm_table_id = $firm_details['id'];
+
+			$report_link = '../inspections/routine_inspection_report_fetch_id/'.$firm_details['id'].'/view/'.$application_type.'/yes';
+
+			$appl_array_pp[$i]['customer_id'] = $customer_id.'-'.$form_type;
+			$appl_array_pp[$i]['firm_name'] = $firm_name;
+			$appl_array_pp[$i]['on_date'] = $each['created'];
+			$appl_array_pp[$i]['report_pdf'] = $report_pdf;
+			$appl_array_pp[$i]['report_link'] = $report_link;
+			$appl_array_pp[$i]['pdf_version'] = $pdf_version_pp;
+			$i=$i+1;
+		}
+
+		$appl_array_lab = array();
+		$i=0;
+		foreach($get_rti_approved_list_for_lab as $each){	
+			
+			$customer_id = $each['customer_id'];
+			$form_type = $this->Customfunctions->checkApplicantFormType($customer_id);
+
+			$report_pdf_field = 'pdf_file';
+			$get_report_pdf = $this->DmiRtiReportPdfRecords->find('all',array('conditions'=>array('customer_id'=>$customer_id),'order'=>'id desc'))->first();
+					
+			$report_pdf = '';
+			$pdf_version_lab = '';
+			if(!empty($get_report_pdf)){
+				$report_pdf = $get_report_pdf[$report_pdf_field];
+				$pdf_version_lab= $get_report_pdf['pdf_version'];
+			}
+				
+			//get firm details
+			$firm_details = $this->DmiFirms->firmDetails($customer_id);
+			$firm_name = $firm_details['firm_name'];					
+			$firm_table_id = $firm_details['id'];
+
+			$report_link = '../inspections/routine_inspection_report_fetch_id/'.$firm_details['id'].'/view/'.$application_type.'/yes';
+
+
+			$appl_array_lab[$i]['customer_id'] = $customer_id.'-'.$form_type;
+			$appl_array_lab[$i]['firm_name'] = $firm_name;
+			$appl_array_lab[$i]['on_date'] = $each['created'];
+			$appl_array_lab[$i]['report_pdf'] = $report_pdf;
+			$appl_array_lab[$i]['report_link'] = $report_link;
+			$appl_array_lab[$i]['pdf_version'] = $pdf_version_lab;
+			
+			$i=$i+1;
+		}
+			
+		$this->set('appl_array_ca',$appl_array_ca);
+		$this->set('appl_array_pp',$appl_array_pp);
+		$this->set('appl_array_lab',$appl_array_lab);
+			
+	}
 	//to show officers wise pending application list on RO/SO Incharge dashboard
 	//on 22-06-2023 by Amol
 	public function getOfficerWisePendingAppl(){
@@ -1698,7 +1952,7 @@ class OthermodulesController extends AppController{
 
 						//check entry in rejected/junked table
 						$this->loadModel('DmiRejectedApplLogs');
-						$checkIfRejected = $this->DmiRejectedApplLogs->find('all',array('fields'=>'id','conditions'=>array('customer_id IS'=>$eachAppl['customer_id'],'appl_type IS'=>$eachflow['application_type'])))->first();
+						$checkIfRejected = $this->DmiRejectedApplLogs->find('all',array('fields'=>'id','conditions'=>array('customer_id IS'=>$eachAppl['customer_id']/*,'appl_type IS'=>$eachflow['application_type']*/)))->first();
 
 						if(empty($checkIfRejected)){
 							if($eachLevel=='level_1' || $eachLevel=='level_2' || $eachLevel=='level_4_ro' || $eachLevel=='level_4_mo' || $eachLevel=='pao'){
@@ -1783,12 +2037,365 @@ class OthermodulesController extends AppController{
 
 
 
+	//To reset the entries in the database whose renewals are pending and unable to find in the dashboard
+	//Author : Akash Thakre
+	//Date : 09-08-2023
+	//For : Renewal Applications
+	
+	function renewalApplicationReset() {
+
+		$message = '';
+		$message_theme = '';
+		$redirect_to = '';
+
+		$this->loadModel('DmiRejectedApplLogs');
+		$this->loadModel('DmiRenewalAllCurrentPositions');
+		$this->loadModel('DmiRenewalApplicantPaymentDetails');
+		$this->loadModel('DmiPaoDetails');
+		$this->loadModel('DmiFirms');
+		$this->loadModel('DmiDistricts');
+		$this->loadModel('DmiRenewalApplicationsResetLogs');
+		
+		$conn = ConnectionManager::get('default');
+		
+		$firmDetails = $conn->execute("SELECT dg.customer_id FROM 
+			(
+				SELECT customer_id,created,pdf_version
+				FROM dmi_grant_certificates_pdfs
+				WHERE id IN (
+				SELECT MAX(id) id
+				FROM dmi_grant_certificates_pdfs
+				GROUP BY customer_id
+				ORDER BY id) 
+			) AS dg
+			
+			INNER JOIN (SELECT customer_id,created
+			FROM dmi_renewal_applicant_payment_details
+			WHERE id IN (
+				SELECT MAX(id) id
+				FROM dmi_renewal_applicant_payment_details
+				WHERE payment_confirmation = 'confirmed'
+				GROUP BY customer_id
+				ORDER BY id) 
+			) AS drm ON drm.customer_id = dg.customer_id AND drm.created::TIMESTAMP >  dg.created::TIMESTAMP")->fetchAll('assoc');
+
+		 // Initialize arrays to store rejected and not rejected customer IDs
+		 $rejectedArray = [];
+		 $notRejectedArray = [];
+	 
+		 foreach ($firmDetails as $each) {
+			// Check if the customer ID exists in the rejected table
+			$ifRejected = $this->DmiRejectedApplLogs->find('all')
+				->where(['customer_id' => $each['customer_id']])
+				->order(['id' => 'DESC'])
+				->toArray();
+			
+			// Decide whether to add the customer ID to rejected or notRejected array
+			if (!empty($ifRejected)) {
+				$rejectedArray[] = $each['customer_id'];
+			} else {
+				$notRejectedArray[] = $each['customer_id'];
+			}
+		}
+		
+		$appl_list = [];
+		foreach ($notRejectedArray as $customer) {
+			$firm_details = $this->DmiFirms->firmDetails($customer);
+			$appl_list[$customer] = $firm_details['customer_id'] . ' - ' . $firm_details['firm_name'];
+		}
+		
+		$this->set('appl_list',$appl_list);
+
+		//Check if the Reset Logs have data to present
+		$all_records = $this->DmiRenewalApplicationsResetLogs->find('all')->toArray();
+		if (!empty($all_records)) {
+			$this->set('all_records',$all_records);
+		}else{
+			$this->set('all_records',null);
+		}
+		
+		if ($this->request->is('post')) {
+
+			$customer_id = trim($this->request->getData('customer_id'));
+			
+			// Check if the customer_id is in the $notRejectedArray
+			if (in_array($customer_id, $notRejectedArray)) {
+
+				$getApplicantPaymemtDetails = $this->DmiRenewalApplicantPaymentDetails->find('all')->where(['customer_id' => $customer_id,'payment_confirmation' => 'confirmed'])->order('id DESC')->first();
+				
+				$getCurrentPositionDetails = $this->DmiRenewalAllCurrentPositions->find('all')->where(['customer_id' => $customer_id])->order('id DESC')->first();
+			
+				//get the ddo details from customer id
+				$firm_details = $this->DmiFirms->firmDetails($customer_id);
+				$pao_id = $this->DmiDistricts->find('all',array('fields'=>'pao_id','conditions'=>array('id IS'=>$firm_details['district'])))->first();
+				$paoID = $pao_id['pao_id'];
+
+				$getPaoDetails = $this->DmiPaoDetails->find('all')->select(['pao_user_id'])->where(['id IS' => $paoID])->first();
+		
+				$paoNameDetails = $this->DmiUsers->find('all')->where(['id IS' => $getPaoDetails['pao_user_id'],'status'=>'active'])->first();
+				
+			
+				if (!empty($paoNameDetails)) {
+
+					//Update the entries in the renewal payment table
+					$this->DmiRenewalApplicantPaymentDetails->updateAll(
+						['pao_id' => $paoID, 'payment_confirmation' => 'pending','modified'=>date('Y-m-d H:i:s')],
+						['id' => $getApplicantPaymemtDetails['id']]
+					);
+
+				
+					// Capture the previous values before updating the renewal current position table
+					$previousCurrentLevel = $getCurrentPositionDetails['current_level'];
+					$previousUserEmailId = $getCurrentPositionDetails['current_user_email_id'];
+
+					// Update the entries in renewal current position table
+					$this->DmiRenewalAllCurrentPositions->updateAll(
+						['current_level' => 'pao', 'current_user_email_id' => $paoNameDetails['email'],'modified'=>date('Y-m-d H:i:s')],
+						['id' => $getCurrentPositionDetails['id']]
+					);
+
+					// Save the reset log with previous values
+					$savelog = $this->DmiRenewalApplicationsResetLogs->saveResetLog(
+						$customer_id,
+						$paoID,
+						$paoNameDetails['id'],
+						$paoNameDetails['email'],
+						$previousCurrentLevel, // Log the previous current level
+						$previousUserEmailId  // Log the previous user email id
+					);
+
+					if ($savelog==true) { 
+		
+						$message = 'The the application is transfered to user id "'.base64_decode($paoNameDetails['email']).'" successfully. Now PAO/DDO can re-verify the application in order to complete renewal process';
+						$message_theme = 'success';
+						$redirect_to = 'renewal_application_reset';
+					}
+				}
+				
+				
+			} else {
+
+				$message = 'The application entered is not valid for reseting or maybe it rejected.';
+				$message_theme = 'failed';
+				$redirect_to = 'renewal_application_reset';
+			}
+		}
+		
+
+		$this->set(compact('message','message_theme','redirect_to'));
+	 
+		 // You might have more code here to perform further actions
+	 
+		 
+	}
 
 
+	//to get the details for the firms to show in the selection of the customer id.
+	//Author : Akash Thakre
+	//Date : 09-08-2023
+	//For : Renewal Applications
+
+	public function getFirmDetailsForRenewalReset(){
+		
+		$this->autoRender = false;
+
+		$this->loadModel('DmiStates');
+		$this->loadModel('DmiDistricts');
+		$this->loadModel('DmiFirms');
+		$this->loadModel('DmiGrantCertificatesPdfs');
+		$this->loadModel('DmiPaoDetails');
+		$this->loadModel('DmiUsers');
+
+		//PostData
+		$customer_id = $this->request->getData('customer_id');
+
+		//Get the firm details
+		$firm_details = $this->DmiFirms->firmDetails(trim($customer_id));
+
+		$list_id = $this->DmiGrantCertificatesPdfs->find('list', array('valueField'=>'id','conditions'=>array('customer_id IS'=>$customer_id)))->toArray();
+
+		if (!empty($list_id)) {
+
+			$fetch_last_grant_data = $this->DmiGrantCertificatesPdfs->find('all', array('conditions'=>array('id'=>max($list_id))))->first();
+			$grant_date = $fetch_last_grant_data['date'];
+
+			$certificate_validity_date = $this->Customfunctions->getCertificateValidUptoDate($customer_id,$grant_date);
+		}
+
+		//get the ddo details from customer id
+		$firm_details = $this->DmiFirms->firmDetails($customer_id);
+		$pao_id = $this->DmiDistricts->find('all',array('fields'=>'pao_id','conditions'=>array('id IS'=>$firm_details['district'])))->first();
+		$paoID = $pao_id['pao_id'];
+
+		$getPaoDetails = $this->DmiPaoDetails->find('all')->select(['pao_user_id'])->where(['id IS' => $paoID])->first();
+
+		$paoNameDetails = $this->DmiUsers->find('all')->where(['id IS' => $getPaoDetails['pao_user_id'],'status'=>'active'])->first();
+		
+
+		
+		$response = [
+			'customer_id' =>$firm_details->customer_id,
+			'firm_name' => $firm_details->firm_name,
+			'street_address' => $firm_details->street_address,
+			'district_name' => $this->DmiDistricts->getDistrictNameById(trim($firm_details['district'])),
+			'state_name'=> $this->DmiStates->getStateNameById(trim($firm_details['state'])),
+			'postal_code'=> $firm_details->postal_code,
+			'export_unit' => $export_unit = $this->Customfunctions->checkApplicantExportUnit($customer_id),
+			'form_type' => $this->Customfunctions->checkApplicantFormType($customer_id),
+			'forRenewal' => $this->Customfunctions->checkApplicantValidForRenewal($customer_id),
+			'lastUpdate' => $this->Customfunctions->getApplicationCurrentStatus($customer_id),
+			'certificate_validity_date' => $certificate_validity_date,
+			'pao_details' => $paoNameDetails['f_name'] ." ". $paoNameDetails['l_name'] . " ( " .base64_decode($paoNameDetails['email']) ." ) "
+		];
+		
+		echo '~' . json_encode($response) . '~';
+		exit;
+		
+	}
+
+
+
+
+	//To add the application in the reject table by the head office.
+	//Author : Amol Choudhari
+	//Date : 09-08-2023
+	//For : Reject Applications
+
+	public function markApplRejected(){
+
+		$this->loadModel('DmiRoOffices');
+		$this->loadModel('DmiApplicationTypes');
+
+		//get Application types list
+		$applTypesList = $this->DmiApplicationTypes->find('list',array('valueField'=>'application_type','order'=>'id ASC'))->toArray();
+		$this->set('applTypesList',$applTypesList);
+
+	}
+
+	public function rejectApplication(){
+
+		$this->autoRender= false;
+
+		$customer_id = trim($_POST['customer_id']);
+		$appl_type = htmlentities($_POST['appl_type'], ENT_QUOTES);
+		$remark = htmlentities($_POST['remark'], ENT_QUOTES);
+
+		
+		
+		
+		//First Check if the applcation is already exist in the reject table
+		$this->loadModel('DmiRejectedApplLogs');
+		$is_application_rejected = $this->DmiRejectedApplLogs->find('all')->where(['customer_id IS ' => $customer_id,'appl_type' => $appl_type])->order('id DESC')->first();
+		if (empty($is_application_rejected)) {
+
+			//insert record in reject log table
+			$rejectlogEntity = $this->DmiRejectedApplLogs->NewEntity(array(
+				'appl_type' => $appl_type,
+				'form_type' => $this->Customfunctions->checkApplicantFormType($customer_id,$appl_type),
+				'customer_id' => $customer_id,
+				'by_user' => $this->Session->read('username'),
+				'remark' => $remark,
+				'created' => date('Y-m-d H:i:s')
+			));
+
+			$this->DmiRejectedApplLogs->save($rejectlogEntity);
+
+			$message = '1'; 
+
+		} else {
+
+			$message = "Sorry this application is already has been rejected on date :"	.$is_application_rejected['created']. " by the user :	"	 
+			.base64_decode($is_application_rejected['by_user'])	. 	"	with reason : " .$is_application_rejected['remark'] ; 
+		}
+		
+		echo '~'.$message.'~';
+		exit;
+	}
+	
+
+
+	//get the details to mark reject the application
+	//Author : Amol Choudhari
+	//Date : 09-08-2023
+	//For : Reject Applications
+
+	public function getApplDetailsToMarkReject() {
+
+		$customer_id = $_POST['customer_id'];
+
+		$this->loadModel('DmiUserRoles');
+		$check_user_role = array();
+		$this->loadComponent('Randomfunctions');
+		$check_user_role['super_admin']='yes';//set default 
+		$resultArray = $this->Randomfunctions->dashboardApplicationSearch($customer_id,$check_user_role);
+		$this->loadModel('DmiRejectedApplLogs');
+		$rejectedData = $this->DmiRejectedApplLogs->find('all',array('conditions'=>array('customer_id IS'=>$customer_id)))->last();
+
+		//$isApplSurrender = $this->Customfunctions->isApplicationSurrendered($customer_id);
+		//$isApplSuspended = $this->Customfunctions->isApplicationSuspended($customer_id);
+		//$isApplCancelled = $this->Customfunctions->isApplicationCancelled($customer_id);
+		
+		if ($resultArray['no_result']==null) {
+
+			/*if (!empty($isApplCancelled)) {
+				echo "<b>This Application is Cancelled on ".$isApplCancelled." and no longer available.</b>";
+			} else {
+
+				//Check if application is suspended
+				if (!empty($isApplSuspended)) {
+					echo "<b>This Application is Suspended Upto ".$isApplSuspended." and no longer available.</b>";
+				} else {
+
+					//Check if the Application is Surrendered
+					if (!empty($isApplSurrender)) {
+						echo "<b>This Application is Surrendered on ".$isApplSurrender." and no longer available.</b>";
+					} else {
+						*/
+						echo "
+							<h5>Application Details</h5>
+							<table class='table table-sm table-bordered'>
+							<thead>
+								<tr>
+									<th>Appl. Type</th>
+									<th>Appl. Id</th>
+									<th>Firm Name</th>
+									<th>District</th>
+									<th>Position</th>								
+									<!--<th>Available With</th>-->
+									<!--<th>Status</th>-->";
+		
+							echo "</tr>
+							</thead>
+							<tbody>
+								<tr>
+									<td>".$resultArray['process']."</td>
+									<td>".$customer_id."</td>
+									<td>".$resultArray['firm_data']['firm_name']."</td>
+									<td>".$resultArray['firm_data']['district']."</td>
+									<td>".$resultArray['current_position']."</td>
+									<!--<td>".$resultArray['currentPositionUser']." <br>( ".$resultArray['getEmailCurrent']." )"."</td>-->";
+									//added by laxmi on 13-12-23
+									/*if(!empty($rejectedData['customer_id']) && $rejectedData['customer_id'] == $customer_id){
+										echo "<td>Rejected</td>";
+									}else{//added appl_status on 19-07-2023 by Amol
+										echo "<td>".$resultArray['appl_status']."</td>";
+									}*/
+		
+							echo "</tr>
+							</tbody>
+						</table>";
+				//	}
+			//	}
+		//	}
+			
+		}else{
+			echo $resultArray['no_result'];
+		}
+		
+		exit;
+	}
 
 
 }
 
 ?>
-
-

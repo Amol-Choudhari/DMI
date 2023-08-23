@@ -68,6 +68,8 @@
 		echo $this->Html->script('dataTables.bootstrap.min');
 		echo $this->Html->script('dataTables.responsive.min');
 		echo $this->Html->script('responsive.bootstrap.min');
+		echo $this->Html->script('Validations/surrender_form_validations');
+
 		// new template js ends
 
 		// call forms validation file
@@ -78,7 +80,7 @@
 		echo $this->Html->script('add_more_row');
 		echo $this->Html->script('jquery-confirm.min');
 		echo $this->Html->script('custom.validation.v.5');																				 
-
+		echo $this->Html->script('Validations/surrender_form_validations');
 		echo $this->Html->script('no_back');
 	?>
 	

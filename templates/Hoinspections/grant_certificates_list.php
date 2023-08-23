@@ -32,7 +32,7 @@
 					<th>Firm Name</th>
 					<th>Applicant Id</th>
 					<th>Grant Date</th>
-					<?php if($_SESSION['is_old']=='old') { ?>
+					<?php if(!empty($_SESSION['is_old']) && $_SESSION['is_old']=='old') { ?>
 						<th>Old Cert. Pdf</th>
 					<?php }else{ ?>
 						<th>Cert. Pdf</th>
@@ -44,7 +44,7 @@
 						<th>Report. | Pdf</th>
 						<!-- added code/conditions to show btn to generate esigned cert. for old appl. OR show esigned certificate pdf link
 							on 20-06-2023 by Amol -->
-						<?php if($_SESSION['is_old']=='old') { ?>
+						<?php if(!empty($_SESSION['is_old']) && $_SESSION['is_old']=='old') { ?>
 							<?php if(empty($checkAlreadyOldEsigned)){ ?>
 								<th>Action</th>
 							<?php }else{ ?>
@@ -109,7 +109,7 @@
 
 								<!-- added code/conditions to show btn to generate esigned cert. for old appl. OR show esigned certificate pdf link
 										on 20-06-2023 by Amol -->
-									<?php if($_SESSION['is_old']=='old') { ?>
+									<?php if(!empty($_SESSION['is_old']) && $_SESSION['is_old']=='old') { ?>
 										
 										<?php if(empty($checkAlreadyOldEsigned)){ ?>
 											<?php if($each['show_gen_old_cert_btn']=='yes'){ ?>

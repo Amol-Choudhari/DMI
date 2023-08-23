@@ -119,7 +119,17 @@ class DmiCustomersTable extends Table{
 		);
 		
 		
-		
+	//Description : to get the customer details by customer id
+	//Author :Akash Thakre
+	//Date : 21-04-2023
+	//For : Surrender Flow (SOC)
+
+	public function getCustomerDetails($customer_id){
+		$result = $this->find()->where(['customer_id IS'=>$customer_id])->order(['id'=>'DESC'])->first();
+		if (!empty($result)) {
+			return $result;
+		}
+	}	
 		
 		
 	

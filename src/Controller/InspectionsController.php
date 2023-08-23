@@ -60,7 +60,24 @@ class InspectionsController extends AppController{
 		$this->redirect('/inspections/inspection-report');
 		
 	}
+	// this function added by shankhpal shende on 02/01/2023
+	// for Routine inspection report view 
+	public function routineInspectionReportFetchId($id,$mode,$application_type,$fromHoLevel=null){
+		
+	
+		$this->loadModel('DmiFirms');
+		$customer_id_result = $this->DmiFirms->find('all',array('fields'=>'customer_id', 'conditions'=>array('id IS'=>$id)))->first();
+		$customer_id = $customer_id_result['customer_id'];
+		$this->Session->write('customer_id',$customer_id);
+		$this->Session->write('application_mode',$mode);
+		$this->Session->write('fromHoLevel',$fromHoLevel);
+		$this->Session->write('application_type',$application_type);
+		$this->Session->delete('section_id');
+		$this->Session->delete('edit_directors_details_id');
 
+		$this->redirect('/inspections/inspection-report');
+		
+	}
 	public function section($id){
 		
 		$this->Session->write('section_id',$id);
@@ -188,7 +205,10 @@ class InspectionsController extends AppController{
 		
 		$report_final_submit_table = $Dmi_flow_wise_tables_list->getFlowWiseTableDetails($application_type,'inspection_report');
 		$Dmi_report_final_submit_table = TableRegistry::getTableLocator()->get($report_final_submit_table);
-		
+			
+		//added by shankhpal shende on 30/12/2022
+		$Dmi_rti_final_submit_table = TableRegistry::getTableLocator()->get('DmiRtiFinalSubmits');
+
 		$Dmi_allocation_table_name = $Dmi_flow_wise_tables_list->getFlowWiseTableDetails($application_type,'allocation');
 		$Dmi_allocation_table = TableRegistry::getTableLocator()->get($Dmi_allocation_table_name);
 		
@@ -270,6 +290,19 @@ class InspectionsController extends AppController{
 		$show_message = '';
 		$redirect_url = '../inspections/inspection-report';			
 		
+		// Description : Display Comodity
+		// Author : Shankhpal Shende
+		// Date : 13/05/2023
+		// For Module :Routine Inspection
+		//taking id of multiple sub commodities	to show names in list	
+		$this->loadModel('MCommodity');
+		$added_firms = $this->DmiFirms->find('all',array('conditions'=>array('customer_id IS'=>$customer_id)))->first();
+		$sub_comm_id = explode(',',(string) $added_firms['sub_commodity']); #For Deprecations
+ 
+		$sub_commodity_value = $this->MCommodity->find('list',array('valueField'=>'commodity_name', 'conditions'=>array('commodity_code IN'=>$sub_comm_id)))->toList();
+		$this->set('sub_commodity_value',$sub_commodity_value);
+
+
 		//For edit referred_back						
 		if(null!== ($this->request->getData('save_edited_reply'))){
 			
@@ -457,8 +490,40 @@ class InspectionsController extends AppController{
 					}	
 					if(empty($section_form_details[0]['created']) && count($allSectionDetails)!=$section_id){						
 						$this->Session->write('section_id',$section_id+1);
-					}		
-					$redirect_url = '../inspections/inspection-report';	
+					}	
+					
+					 // The primary reason for including this condition was
+					 // When there is no more routine inspection flow pending, this is the final step.
+					 // When the application type is 10, we add a record to two tables.
+					 // 1. dmi_rti_final_reports
+					// 2. dmi_rti_final_submits
+					// Added by shankhpal shende on 30/12/2022
+					if($application_type == '10' && $form_type = 'RTI'){
+
+						$Dmi_report_final_submit_Entity = $Dmi_report_final_submit_table->newEntity(array(
+							'customer_id'=>$customer_id,
+							'status'=>'approved',
+							'current_level'=>'level_3',
+							'created'=>date('Y-m-d H:i:s'),
+							'modified'=>date('Y-m-d H:i:s')				
+						)); 
+			
+						$Dmi_report_final_submit_table->save($Dmi_report_final_submit_Entity);
+						
+						$Dmi_rti_final_submit_Entity = $Dmi_rti_final_submit_table->newEntity(array(
+							'customer_id'=>$customer_id,
+							'status'=>'approved',
+							'current_level'=>'level_3',
+							'created'=>date('Y-m-d H:i:s'),
+							'modified'=>date('Y-m-d H:i:s')				
+						)); 
+			
+						$Dmi_rti_final_submit_table->save($Dmi_rti_final_submit_Entity);
+						
+						$redirect_url = '../othermodules/routineInspectionList'; // change added by shankhpal shende for rti
+					}
+				
+					
 
 				}else{  
 						$result_message = $this->reportPopupMessage('accepted',2,$section_details,$firm_type_text,$office_type);	
@@ -592,8 +657,9 @@ class InspectionsController extends AppController{
 		$this->set('section_form_details',$section_form_details);
 		
 		$this->set('message',$message);
-		$this->set('redirect_to',$redirect_to);	 
-	
+		$this->set('redirect_to',$redirect_to);	
+		$this->set('firm_type',$firm_type);  # to set the firm_type for validation in RTI MOdule added by shankhpal on 25/05/2023
+		
 		//exit;
 	}
 	
@@ -815,10 +881,26 @@ class InspectionsController extends AppController{
 				
 				//deleting record from temp esign status table, to clear that esign process reached till end succesfully.
 				//added on 01-10-2018 by Amol
-				$this->DmiTempEsignStatuses->deleteTempEsignRecord($customer_id);													 
+				$this->DmiTempEsignStatuses->deleteTempEsignRecord($customer_id);
+
+				if ($_SESSION['application_type'] == '9') {
+					
+					$this->loadModel('DmiSurrenderSmsEmailTemplates');
+
+					if ($firm_type) {
+						$this->DmiSurrenderSmsEmailTemplates->sendMessage(1,$customer_id); //Applicant
+					} elseif ($firm_type) {
+						$this->DmiSurrenderSmsEmailTemplates->sendMessage(2,$customer_id); //Applicant
+					} elseif ($firm_type) {
+						$this->DmiSurrenderSmsEmailTemplates->sendMessage(3,$customer_id); //Applicant
+					}
+					$this->DmiSurrenderSmsEmailTemplates->sendMessage(4,$customer_id); //RO
+				}
+
+
+
 				$message = $firm_type_text.' - '.'Final Granted Successfully';
 				$redirect_to = '../applicationformspdfs/'.$allSectionDetails[0]['grant_pdf'];	
-				//$this->view = '/Element/message_boxes';		
 				
 				
 		}elseif(!empty($customer_level_3_approved)){
@@ -845,6 +927,7 @@ class InspectionsController extends AppController{
 				$redirect_to = '../applicationformspdfs/'.$allSectionDetails[0]['grant_pdf'];	
 				//$this->view = '/Element/message_boxes';		
 		}			
+
 		
 		$this->set('message',$message);
 		$this->set('redirect_to',$redirect_to);			
@@ -859,6 +942,26 @@ class InspectionsController extends AppController{
 		$this->Session->delete('edit_const_oils_tank_id');
 		$this->Session->delete('edit_storage_tank_id');	
 	}
+
+
+	// EDIT SAMPLE ID ADDED BY SHANKHPAL SHENDE ON 13/12/2022
+		public function editSampleId($id) {
+		   
+			$this->Session->write('edit_sample_id',$id);
+			$this->redirect('/Inspections/inspection-report');
+		}
+
+		// DELETE SAMPLE ID ADDED by shankhpal shende on 14-12-2022
+		public function deleteSampleId($id) {
+			
+			$record_id = $id;
+			$this->loadModel('DmiCheckSamples');
+			$tbl_delete_result = $this->DmiCheckSamples->deleteSampleDetails($record_id);// call to custome function from model
+			if ($tbl_delete_result == 1)
+			{
+				$this->redirect('/Inspections/inspection-report');
+			}
+		}
 
 }
 ?>

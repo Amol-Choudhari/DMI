@@ -6,6 +6,7 @@ use App\Network\Email\Email;
 use App\Network\Request\Request;
 use App\Network\Response\Response;
 use Cake\ORM\TableRegistry;
+use Cake\Collection\Collection;							   
 
 class ApplicationController extends AppController{
 
@@ -90,23 +91,74 @@ class ApplicationController extends AppController{
 
 
 	// CHANGE REQUEST
+	//updated on 13-04-2023 for change request appl							
 	public function changeRequest() {
 
 		$this->viewBuilder()->setLayout('secondary_customer');
 		$this->loadModel('DmiChangeSelectedFields');
 		$this->loadModel('DmiChangeFieldLists');
 
+		$this->loadComponent('Beforepageload');
+		$this->Beforepageload->showButtonOnSecondaryHome();
+
 		$customer_id = $this->Customfunctions->sessionCustomerID();
 		$form_type = $this->Customfunctions->checkApplicantFormType($customer_id);
 		$grantDateCondition = $this->Customfunctions->returnGrantDateCondition($customer_id);
-		$final_submit_details = $this->Customfunctions->finalSubmitDetails($customer_id,'application_form');
+		//$final_submit_details = $this->Customfunctions->finalSubmitDetails($customer_id,'application_form');
+		
+		$this->loadModel('DmiChangeFinalSubmits');
+		$final_submit_details = $this->DmiChangeFinalSubmits->find('all', array('conditions'=>array('customer_id IS'=>$customer_id,'status'=>'pending',$grantDateCondition),'order'=>'id DESC'))->first();
 		$this->set('final_submit_details',$final_submit_details);
 
-		$changeFieldsList = $this->DmiChangeFieldLists->find('list',array('keyField'=>'field_id','valueField'=>'change_field','conditions'=>array('form_type IS'=>$form_type),'order'=>'field_id'))->toArray();
+		$firm_type = $this->Customfunctions->firmType($customer_id);
+		//commented the query on 15-05-2023, and added below code to restrict change fields options as per the CA,PP and Lab
+		//$changeFieldsList = $this->DmiChangeFieldLists->find('list',array('keyField'=>'field_id','valueField'=>'change_field','conditions'=>array('form_type IS'=>'common','firm_type IN'=>array('common',$firm_type),'OR'=>array('firm_type LIKE'=>'%'.$firm_type,'firm_type LIKE'=>$firm_type.'%')),'order'=>'field_id'))->toArray();
+	
+		//added new query on 15-05-2023 to get specific fields only as per the applicant CA,PP and Lab
+		$query = "SELECT field_id, change_field FROM dmi_change_field_lists WHERE form_type = 'common'
+        	AND (firm_type = 'common' OR firm_type = :firmType OR firm_type ILIKE '%' || :firmType || '%' OR firm_type ILIKE :firmType || '%')
+    		ORDER BY field_id";
+
+		$connection = $this->DmiChangeFieldLists->getConnection();
+		$results = $connection->execute($query, ['firmType' => $firm_type])->fetchAll('assoc');
+
+		$changeFieldsList = (new Collection($results))->combine('field_id', 'change_field')->toArray();
+
+		//changing commodity and packing type text in the list as per firm type
+		//on 15-07-2023 by Amol
+		if($firm_type==1 || $firm_type==3){
+			$changeFieldsList[7] = 'Commodity Group/ Commodity';
+		}else{
+			$changeFieldsList[7] = 'Packing Type';
+		}
+	
 		$this->set('changeFieldsList',$changeFieldsList);
 
 		$selectedValues = $this->DmiChangeSelectedFields->selectedChangeFields();
 		$this->set('selectedValues',$selectedValues[0]);
+		
+		
+		//to solve undefined variable issue
+		$this->set('IsApproved','');
+		$this->set('show_button','');
+		$this->set('show_renewal_button','');
+		
+		//check if change application is already in process and yet granted
+		//then redirect to appl directly, not on field selection window.
+		//applied on 17-03-2023 by Amol
+		$this->loadModel('DmiChangeFinalSubmits');
+		$checkIfInProcess = $this->DmiChangeFinalSubmits->find('all',array('conditions'=>array('customer_id'=>$customer_id),'order'=>'id desc'))->first();
+		if (!empty($checkIfInProcess)) {
+			if (!($checkIfInProcess['status']=='approved' && $checkIfInProcess['current_level']=='level_3')) {
+				
+				$fieldResult = $this->DmiChangeFieldLists->changeFieldList($selectedValues[0]);
+				$this->Session->write('changefield',$fieldResult[0]);
+				$this->Session->write('paymentforchange',$fieldResult[1]);
+				$this->redirect('/application/application-for-certificate');
+				
+			}
+		}
+		
 
 		if ($this->request->is('post')) {
 
@@ -125,9 +177,8 @@ class ApplicationController extends AppController{
 			$this->Session->write('paymentforchange',$fieldResult[1]);
 			$this->redirect('/application/application-for-certificate');
 		}
+		
 	}
-	
-	
 	// FILL FORM FETCH ID
 	public function fillFormFetchId($id,$applicant_type,$mode,$authscrutiny=null) {
 
@@ -228,12 +279,12 @@ class ApplicationController extends AppController{
 
 		$this->Customfunctions->showOldCertDetailsPopup($customer_id);
 
-
-		if ($application_type == 3) {
-			$DmiAllDirectorsDetails = TableRegistry::getTableLocator()->get('DmiChangeDirectorsDetails');
-		} else {
+	//commented on 13-04-2023 for change request appl
+	//	if ($application_type == 3) {
+	//		$DmiAllDirectorsDetails = TableRegistry::getTableLocator()->get('DmiChangeDirectorsDetails');
+	//	} else {
 			$DmiAllDirectorsDetails = TableRegistry::getTableLocator()->get('DmiAllDirectorsDetails');
-		}
+	//	}
 
 		$added_directors_details = $DmiAllDirectorsDetails->allDirectorsDetail($customer_id);
 		$this->set('added_directors_details',$added_directors_details);
@@ -299,6 +350,13 @@ class ApplicationController extends AppController{
 			$checkIfgrant = $this->DmiAdpGrantCertificatePdfs->find('all',array('conditions'=>array('customer_id IS'=>$customer_id),'order'=>'id DESC'))->first();
 			$this->set('checkIfgrant',$checkIfgrant);
 		}
+
+		//For Surrender of Certificate (SOC) Flow HAVING Application Type [9] - Akash [24-11-2022]
+		if ($application_type == 9) {
+	
+			$form_type='SOC';
+		}
+
 		$this->set('form_type',$form_type);
 		
 		$firm_type_text = $this->Customfunctions->firmTypeText($customer_id);
@@ -355,25 +413,38 @@ class ApplicationController extends AppController{
 
 		$this->set('final_submit_status',$final_submit_status);
 
-
+		//commented on 13-04-2023 for change request appl
 		/* For change module*/
-		$fstatuses = array('pending','replied','approved');
+		/*$fstatuses = array('pending','replied','approved');
 		if ($application_type == 3 && in_array($final_submit_status,$fstatuses) == false) {
 			$changefields = $this->Session->read('changefield');
 		} else {
 			$changefields = array();
-		}
+		}*/
+		$changefields = array();
 		
 		$this->set('changefields',json_encode($changefields));
 
+		//updated on 13-04-2023 for change request appl
 		$selectedSections = array();
+		$change_details = array();
+		$last_details = array();
+		$selectedValues = array();
 		if ($application_type == 3) {
 			$this->loadModel('DmiChangeSelectedFields');
+			$this->loadModel('DmiChangeApplDetails');
 			$selectedfields = $this->DmiChangeSelectedFields->selectedChangeFields();
-			$selectedSections = $selectedfields[2];
+			//$selectedSections = $selectedfields[2];
+			$selectedValues = $selectedfields[0];
+
 		}
 		
-		$this->set('selectedSections',$selectedSections);
+		//$this->set('changeDistList',$changeDistList);
+		$this->set('added_directors_details',$added_directors_details);
+		//$this->set('selectedSections',$selectedSections);
+		$this->set('selectedValues',$selectedValues);
+		$this->set('last_details',$last_details);
+		$this->set('change_details',$change_details);
 
 
 		// Check current forms is saved or not
@@ -456,9 +527,14 @@ class ApplicationController extends AppController{
 						}
 					}
 
-					$message = $firm_type_text.' - '.ucwords(str_replace('_',' ',$section_details['section_name'])).' section, '.$process_query.' successfully';
+					// This message is changed for the Surrender module (SOC) - Akash [12-05-2023]
+					if ($application_type == 9) {
+						$message = "Application of Surrender for ".$firm_type_text.' - '.ucwords(str_replace('_',' ',$section_details['section_name'])).' section, '.$process_query.' successfully';
+					}else{
+						$message = $firm_type_text.' - '.ucwords(str_replace('_',' ',$section_details['section_name'])).' section, '.$process_query.' successfully';
+					}
 
-					//Added this call to save the user action log on 04-03-2022 by Akash
+					#Action: Application Section Saved
 					if ($application_type == 4) {
 						$this->Customfunctions->saveActionPoint('Application '."($process_query)", 'Success');
 					} else {
@@ -498,7 +574,14 @@ class ApplicationController extends AppController{
 				if ($final_submit_call_result == true) {
 
 					$this->Customfunctions->saveActionPoint('Application Final Submit', 'Success'); #Action
-					$message = $firm_type_text.' - Final submitted successfully ';
+
+					// This message is changed for the Surrender module (SOC) - Akash [12-05-2023]
+					if ($application_type == 9) {
+						$message = "Application of Surrender for ".$firm_type_text.' - Final submitted successfully ';
+					}else{
+						$message = $firm_type_text.' - Final submitted successfully ';
+					}
+
 					$message_theme = 'success';
 
 					//For Chemist i.e Apllication Type 4 then redirect to Chemist Home after Final Submit -> Akash [29-09-2021].
@@ -558,8 +641,14 @@ class ApplicationController extends AppController{
 
 		} elseif (null !== $this->request->getData('add_tbl_details')) {
 
-			$this->loadModel('DmiAllTblsDetails');
-			$save_details_result = $this->DmiAllTblsDetails->saveTblDetails($customer_id,$this->request->getData());
+			//updated on 13-04-2023 for change request appl
+			if ($application_type == 3) {
+				$this->loadModel('DmiChangeAllTblsDetails');
+				$save_details_result = $this->DmiChangeAllTblsDetails->saveTblDetails($customer_id,$this->request->getData());
+			}else{
+				$this->loadModel('DmiAllTblsDetails');
+				$save_details_result = $this->DmiAllTblsDetails->saveTblDetails($customer_id,$this->request->getData());
+			}
 			
 			if ($save_details_result == 1) {
 				$this->Session->delete('edit_tbl_id');
@@ -777,6 +866,23 @@ class ApplicationController extends AppController{
 			
 			if (!empty($list_applicant_payment_id)) { $process_query = 'Updated'; } else { $process_query = 'Saved'; }
 
+
+			//condition added for change module
+			//to get changed commodities or packing types if applied in change
+			//on 13-04-2023 by Amol
+			if ($application_type == 3) {
+				$this->loadModel('DmiChangeApplDetails');
+				$getChangeDetails = $this->DmiChangeApplDetails->find('all',array('fields'=>array('commodity','packing_types'),'conditions'=>array('customer_id IS'=>$customer_id),'order'=>'id desc'))->first();
+				if (!empty($getChangeDetails)) {
+					if (!empty($getChangeDetails['commodity'])){
+						$firm_details['sub_commodity'] = $getChangeDetails['commodity'];
+					}
+					elseif (!empty($getChangeDetails['packing_types'])) {
+						$firm_details['packaging_materials'] = $getChangeDetails['packing_types'];
+					}
+				} 
+
+			}
 			$sub_commodity_array = explode(',',(string) $firm_details['sub_commodity']); #For Deprecations
 
 			if (!empty($firm_details['sub_commodity'])) {
@@ -889,10 +995,19 @@ class ApplicationController extends AppController{
 						$this->DmiSmsEmailTemplates->sendMessage(5,$customer_id); #APPLICANT , RO , DDO
 						$this->DmiSmsEmailTemplates->sendMessage(6,$customer_id); #Applicant , RO , DDO
 						
+
+						// This message is changed for the Surrender module (SOC) - Akash [12-05-2023]
+						if ($application_type == 9) {
+							$message = "Application of Surrender for ".$firm_type_text.' - Final submitted successfully ';
+						}else{
+							$message = $firm_type_text.' - Final submitted successfully ';
+						}
+
 						$message_theme = 'success';
-						$message = $firm_type_text.' - Final submitted successfully ';
+						//$message = $firm_type_text.' - Final submitted successfully ';
 						$redirect_to = '../applicationformspdfs/'.$section_details['forms_pdf'];
 						$this->viewBuilder()->setVar('message', $message);
+						$this->viewBuilder()->setVar('message_theme', $message_theme);
 						$this->viewBuilder()->setVar('redirect_to', $redirect_to);
 
 					} else {
@@ -903,6 +1018,7 @@ class ApplicationController extends AppController{
 						$message = $firm_type_text.' - All Sections not filled, Please fill all Section and then Final Submit ';
 						$redirect_to = '../application/application-for-certificate';
 						$this->viewBuilder()->setVar('message', $message);
+						$this->viewBuilder()->setVar('message_theme', $message_theme);
 						$this->viewBuilder()->setVar('redirect_to', $redirect_to);
 					}
 
@@ -950,6 +1066,7 @@ class ApplicationController extends AppController{
 					$message = $firm_type_text.' - Payment Section, '.$process_query.' successfully';
 					$redirect_to = 'payment';
 					$this->viewBuilder()->setVar('message', $message);
+					$this->viewBuilder()->setVar('message_theme', $message_theme);
 					$this->viewBuilder()->setVar('redirect_to', $redirect_to);
 		
 					$this->render('/element/message_boxes');
@@ -1003,7 +1120,14 @@ class ApplicationController extends AppController{
 		$final_submit_call_result =  $this->Customfunctions->applicationFinalSubmitCall($customer_id,$all_section_status);
 
 		if ($final_submit_call_result == true) {
-			$message = $firm_type_text.' - Final submitted successfully ';
+
+			// This message is changed for the Surrender module (SOC) - Akash [12-05-2023]
+			if ($application_type == 9) {
+				$message = "Application of Surrender for ".$firm_type_text.' - Final submitted successfully ';
+			}else{
+				$message = $firm_type_text.' - Final submitted successfully ';
+			}
+
 			$message_theme = 'success';
 			$redirect_to = '../applicationformspdfs/'.$section_details['forms_pdf'];
 		} else {
@@ -1033,8 +1157,18 @@ class ApplicationController extends AppController{
 	// DELETE TBL ID
 	public function deleteTblId($id) {
 		$record_id = $id;
-		$this->loadModel('DmiAllTblsDetails');
-		$tbl_delete_result = $this->DmiAllTblsDetails->deleteTblDetails($record_id);// call to custome function from model
+
+		$application_type = $this->Session->read('application_type');
+
+		//this condition and code added on 06-07-2022 by Amol
+		if($application_type==3){
+			$this->loadModel('DmiChangeAllTblsDetails');
+			$tbl_delete_result = $this->DmiChangeAllTblsDetails->deleteTblDetails($record_id);
+		}else{
+			$this->loadModel('DmiAllTblsDetails');
+			$tbl_delete_result = $this->DmiAllTblsDetails->deleteTblDetails($record_id);// call to custome function from model
+		}
+			
 		if ($tbl_delete_result == 1)
 		{
 			$this->redirect('/application/application-for-certificate');

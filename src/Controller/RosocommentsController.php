@@ -197,37 +197,43 @@ use Cake\Utility\Hash;
 				$this->loadModel($report_pdf_table);				
 			}
 			
-			if(!empty($report_pdf_table)){
-				
-				$report_pdf_path = $this->$report_pdf_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id),'order'=>'id DESC'))->first();
-				if(!empty($report_pdf_path)){
-	 
-					//condition added on 08-03-2023 for CA export report and pdf links
-					if($application_type==1 && $checkExport=='yes'){
-						$download_report_pdf_file = $report_pdf_path['report_docs'];
-					}else{
-						$download_report_pdf_file = $report_pdf_path['pdf_file'];
-					}
+		//added applicationtype==3 condition on 19-04-2023, to get change report table
+		elseif($application_type==3){
+			$report_pdf_table = 'DmiChangeSiteinspectionReports';
+			$this->loadModel($report_pdf_table);				
+		}
+		
+		if(!empty($report_pdf_table)){
+			
+			$report_pdf_path = $this->$report_pdf_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id),'order'=>'id DESC'))->first();
+			if(!empty($report_pdf_path)){
+	
+				//condition added on 08-03-2023 for CA export report and pdf links
+				if(($application_type==1 && $checkExport=='yes') || $application_type==3){//added applicationtype==3 condition on 19-04-2023
+					$download_report_pdf_file = $report_pdf_path['report_docs'];
+				}else{
+					$download_report_pdf_file = $report_pdf_path['pdf_file'];
 				}
 			}
-			$this->set('download_report_pdf',$download_report_pdf_file);
-			$this->set('report_pdf_path',$report_pdf_path);
-			
-			// Check Ho inspection reqired for current application	
-			$HoInspectionExist = $this->Flowbuttons->HoInspectionExist($customer_id);
-			$this->set('HoInspectionExist',$HoInspectionExist);
-			
-			//only if HO level verification exists in the flow
-			$amaapproved='';
-			if ($HoInspectionExist == 'yes') {				
-				// Check current application ama approved or not	
-				$amaapproved = $this->$ama_approved_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id, $grantDateCondition)))->first();				
-				if(!empty($amaapproved)){
-					$amaapproved = 'yes';
-				}
-				
+		}
+		$this->set('download_report_pdf',$download_report_pdf_file);
+		$this->set('report_pdf_path',$report_pdf_path);
+		
+		// Check Ho inspection reqired for current application	
+		$HoInspectionExist = $this->Flowbuttons->HoInspectionExist($customer_id);
+		$this->set('HoInspectionExist',$HoInspectionExist);
+		
+		//only if HO level verification exists in the flow
+		$amaapproved='';
+		if ($HoInspectionExist == 'yes') {				
+			// Check current application ama approved or not	
+			$amaapproved = $this->$ama_approved_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id, $grantDateCondition)))->first();				
+			if(!empty($amaapproved)){
+				$amaapproved = 'yes';
 			}
-			$this->set('amaapproved',$amaapproved);
+			
+		}
+		$this->set('amaapproved',$amaapproved);
 
 			//SO can grant only CA non Bevo appl, and with RO approval, on 23-09-2021 by Amol
 			// Show final grant butto to SO user, if he have power to grant the application
@@ -459,8 +465,9 @@ use Cake\Utility\Hash;
 
 			$this->loadModel("DmiUserRoles");
 			$this->loadModel("DmiApplWithRoMappings");
-			$application_type = $this->Session->read('application_type');
-			$form_type = $this->Customfunctions->checkApplicantFormType($customer_id);	
+			//$application_type = $this->Session->read('application_type');
+			$application_type = 1; //intentionally set to 1, to get form type like A,B,C,D,E,F and not like FDC,EC,SOC etc. on 13-04-2023
+			$form_type = $this->Customfunctions->checkApplicantFormType($customer_id,$application_type);	
 			$office_type = $this->Customfunctions->getApplDistrictOffice($customer_id);	
 					
 			$find_ro_email_id = $this->DmiApplWithRoMappings->getOfficeDetails($customer_id);

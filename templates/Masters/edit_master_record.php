@@ -93,6 +93,10 @@
                                             } elseif ($masterId=='19') {
 
                                                 echo $this->element('masters_management_elements/edit_master_elements/edit_documents_list');
+												
+					    }  elseif  ($masterId=='20') {
+					    //For Routine Inspection -> Shankhpal Shende [06/12/2022]
+					    echo $this->element('masters_management_elements/edit_master_elements/edit_period');
                                             }
                                         ?>
                                     </div>

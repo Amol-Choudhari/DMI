@@ -72,7 +72,8 @@
         </tr>   
                     
         <tr>
-            <td><br>With reference to your letter on <?php echo $appl_date; ?>, on the subject cited above the following 15 Digit Codes are allotted for the printing of Agmark replica.<!-- in lieu of Agmark labels on ……….. for packing………… 
+            <td><br>With reference to your letter on <?php echo $appl_date; ?>, on the subject cited above the following 15 Digit Codes are allotted for the printing of Agmark replica.
+            <!--<br />The following replica 15 digit code are valid till date <?php echo $validUptoDate; ?>.-><!-- in lieu of Agmark labels on ……….. for packing………… 
                     for the following pack sizes as desired by you. TBL………--></td>
         </tr>
               

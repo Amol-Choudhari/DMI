@@ -37,6 +37,16 @@ class DmiDistrictsTable extends Table{
 		}
 		
 	}
+
+	//getDistrictNameById
+	//Description: this function retrun the district name from the id given
+	//Created : Akash [08-12-2022]
+	public function getDistrictNameById($district_id){
+		$fetch_district_name = $this->find('all',array('fields'=>'district_name','conditions'=>array('id IS'=>$district_id, 'OR'=>array('delete_status IS NULL','delete_status ='=>'no'))))->first();
+		$firm_district_name = $fetch_district_name['district_name'];
+		return $firm_district_name;
+	}
+
 }
 
 ?>

@@ -2,6 +2,7 @@
 <?php echo $this->Form->create(null, array('type'=>'file', 'enctype'=>'multipart/form-data', 'id'=>$section)); ?>
 	<div id="form_outer_main" class="content form-middle">
 		<div id="form_inner_main" class="container-fluid">
+			<h5 class="mt-1 mb-2 tacfw700">Inspection Report for Approval of CA(Export)</h5>
 			<div class="row">
 				<div class="col-md-12">
 					<div class="card card-success">

@@ -23,8 +23,16 @@
 			  <li id="for_inspection_allocation_tab" class="nav-item" title="Status of Allocation/Reallocations for Site Inspection">
 				<a data-toggle="tab" class="nav-link" href="#">For Inspection (<span id="for_inspection_allocation_count">0</span>)</a>
 			  </li>
-		 <?php }?>
+		<?php }
 
+		//This condision added for routine inspection sub tag display when click on 
+		// Allocation tab added by shankhpal shende on 02/12/2022
+		if($_SESSION['current_level'] == 'level_3'){
+		?>
+			<li id="for_routine_inspection_tab" class="nav-item" title="Status of Allocation/Reallocations for Routine Inspection">
+			<a data-toggle="tab" class="nav-link" href="#">For Routine Inspection (<span id="for_routine_inspection_count">0</span>)</a>
+			</li>
+		<?php }?>
 
 	</ul>
 

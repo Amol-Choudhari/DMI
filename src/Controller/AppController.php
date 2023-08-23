@@ -91,6 +91,9 @@ class AppController extends Controller
 			Router::url('/');
 		}
 
+		/*$this->loadComponent('Customfunctions');
+		$check = $this->Customfunctions->getCertificateValidUptoDate('4894/3/SGL/002','31-07-2021 00:00:00');
+		print_r($check);exit;*/
 
 		//This Below we defined the Array for the Application Types from which dashboard will count and list will recognize 
 		//the Flow for DMI users - Amol
@@ -99,11 +102,12 @@ class AppController extends Controller
 		// #5- 15-Digit-Code (FDC) / #6- Allotment of E-Code (EC) / #7- Advance Payment (AP)
 		// #8- Approval of Designated Person (ADP) / #9- Surrender of Certificate (SOC)
 		// #10- Routine Inspection (RTI) / #11 - Bi-annually Grading Report (BGR)
-		$this->Session->write('applTypeArray',array('1','2','3','4','5','6','8'));
+		$this->Session->write('applTypeArray',array('1','2','3','4','5','6','8','9','10'));
 
 		//added on 01-10-2021 by Amol
 		//if not in advance payment mode
 		$this->Session->write('advancepayment','no');
+		$this->Session->write('forReplica','no');
 
 	   //call to aqcms_statistics data on footer section.
 		$this->loadModel('DmiFrontStatistics');
@@ -138,6 +142,18 @@ class AppController extends Controller
 		$current_user_division = $this->DmiUsers->find('all',array('conditions'=>array('email IS'=>$username)))->first();
 		$this->set('current_user_division',$current_user_division);
 
+		//Is Approved
+		$IsApproved=null;
+		$final_submit_id = $this->DmiFinalSubmits->find('all', array('conditions' => array('customer_id IS' => $username),'order'=>'id desc'))->first();
+		if (!empty($final_submit_id)) {
+			//get grant status		
+			if ($final_submit_id['status']=='approved' && $final_submit_id['current_level']=='level_3') {
+				$IsApproved='yes';
+			}
+			$this->Session->write('IsApproved',$IsApproved);
+		}else{
+			$this->Session->write('IsApproved',$IsApproved);
+		}
 
 		if(null == ($this->Session->read('paymentforchange'))){
 			$this->Session->write('paymentforchange','available');

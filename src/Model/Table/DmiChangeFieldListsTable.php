@@ -24,14 +24,18 @@
 				if(!ctype_digit($data)){						
 					$app->invalidActivities();
 				}
-				$changeField = $this->find('all',array('valueField'=>array('c_filed_id','payment','sectionid'),'conditions'=>array('field_id IS'=>$data, 'form_type IS'=>$form_type)))->first();
-				$explode = explode(',',$changeField['c_filed_id']);							
+				$changeField = $this->find('all',array('valueField'=>array('c_filed_id','payment','sectionid'),'conditions'=>array('field_id IS'=>$data, 'form_type IS'=>'common')))->first();
+     				if(!empty($changeField)){
+				//commented this line as it throw deprecation error for null parameter, on 25-05-2023 by Amol
+				//$explode = explode(',',$changeField['c_filed_id']);							
+				$explode = array();
 				$changefieldAarray = array_merge($changefieldAarray,$explode);				
 				
 				if($changeField['payment'] == 'paid'){
 					$paymentforchange = 'available';
 					//break;
-				}						
+					}
+				}		
 			}
 			
 			return array($changefieldAarray,$paymentforchange);

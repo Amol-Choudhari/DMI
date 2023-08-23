@@ -23,8 +23,9 @@
 					} }; 
 				?>
 
-				<?php if ($level3_current_comment_to =='applicant' || $level3_current_comment_to =='both') { ?>
-
+				<?php 
+				 if ($level3_current_comment_to =='applicant' || $level3_current_comment_to =='both') { ?>
+					
 					<div class="card-header"><h3 class="card-title-new"><i class="fa fa-comments"></i> Communications With Applicant</h3></div>
 					<div class="form-horizontal">
 						<div class="card-body p-0 rounded mb-3">
@@ -557,7 +558,11 @@
 					<?php if ($current_level == 'level_3') {
 
 						echo $this->Form->submit('Section Scrutinized', array('name'=>'mo_verified', 'id'=>'verified', 'label'=>false,'class'=>'btn btn-info float-left'));
-						if (empty($allocation_deatils['level_4_ro'])&& empty($allocation_deatils['level_2'])) {
+
+						//This below if block updated to check if the inspection is required or not for perticular application and the ho allocation entry.
+						//This added to resolve the button appearing when the form scrutiny is opened from ho communication
+						// Akash Thakre [28-07-2023]
+						if (empty($allocation_deatils['level_4_ro']) && empty($allocation_deatils['level_2']) && $isSiteInspectionRequired == 'no' && empty($checkHoAllocationEntry)) {
 							echo $this->Form->submit('Forward to '.$forward_to_btn, array('name'=>'accepted_forward', 'id'=>'accepted_forward_btn',  'class'=>'dnone btn btn-success float-left', 'label'=>false));
 						}
 

@@ -96,7 +96,8 @@ $('#delete_referred_to_io_back').click(function(e) {
 	var section_form_details = $('#section_form_details').val();
 	var final_submit_status = $('#final_submit_status_ir').val();
 
-	if(final_submit_status == '' || final_submit_status == null){ final_submit_status = null; }
+	//added cond. for '[]' on 16-08-2023 by Amol for blank array
+	if(final_submit_status == '' || final_submit_status == null || final_submit_status == '[]'){ final_submit_status = null; }
 
 	if(current_level != 'level_2'){
 

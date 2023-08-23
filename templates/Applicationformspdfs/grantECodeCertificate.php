@@ -72,7 +72,7 @@
 				<br>
 				Instructions: <br>
 				1. Entire Quantity of <?php echo $commodity_names; ?> in above premises shall be graded under Agmark.<br>
-				2. You will apply to this office for permission to print Agmark replica stating pack sizes and quantity along with requisite demand draft towards grading charges in advance as usual.<br>
+				2. You will apply to this office for permission to print Agmark replica stating pack sizes and quantity along with requisite advance payment towards grading charges at BharatKosh and updated on agmarkonline.dmi.gov.in.<br>
 				3. You will print the code <b><?php echo $eCode; ?></b> on each package/container just below the Agmark insignia.<br>
 				4. All the necessary prescribed records will have be properly maintained continously by different sections in your premises, updated on day to day basis and regularly checked by the chemist, approved by this directorate and counter checked 
 					by the managing director/authorized employee of the firm and the same may be made available to inspecting officer regularly.<br>

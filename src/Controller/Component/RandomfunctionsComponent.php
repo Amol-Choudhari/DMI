@@ -52,7 +52,7 @@ class RandomfunctionsComponent extends Component {
 		//on 19-07-2023 by Amol, previously it was static only for new and renewal module as per phase I
 		$DmiFlowWiseTablesLists =  TableRegistry::getTableLocator()->get('DmiFlowWiseTablesLists');
 		$flow_wise_tables = $DmiFlowWiseTablesLists->find('all',array('conditions'=>array('application_type IN'=>$this->Session->read('applTypeArray')),'order'=>'id ASC'))->toArray();
-
+		
 		$find_first_allocation = array();
 		$find_ho_allocation = array();
 		$process = '';
@@ -168,13 +168,19 @@ class RandomfunctionsComponent extends Component {
 		//get conditionaly array for Rejected Applications
 		$finalSubmitTable = strtolower(implode('_',array_filter(preg_split('/(?=[A-Z])/',$each_flow['application_form']))));
 		$DmiRejectedApplLogs = strtolower(implode('_',array_filter(preg_split('/(?=[A-Z])/','DmiRejectedApplLogs'))));
+		$applicationType = (int)$each_flow['application_type']; //This line is added to select the rejected application by application_type - Akash [07-08-2023]
 
 		$conn = ConnectionManager::get('default');
 		$conditions = null;
-		$stmt = $conn->execute("select rj.customer_id from $DmiRejectedApplLogs as rj
-								inner join(select fss.customer_id, fss.created from $finalSubmitTable as fss
-								inner join (select max(id) id, customer_id from $finalSubmitTable group by customer_id) as fs on fs.customer_id = fss.customer_id and fs.id = fss.id) as fsr on fsr.customer_id = rj.customer_id
-								inner join (select max(id) id, customer_id from $DmiRejectedApplLogs group by customer_id) as maxall on maxall.customer_id = rj.customer_id and maxall.id = rj.id where rj.created > fsr.created");
+
+		// Update : Below query is updated with the application type checking in where condition to check application type while selecting the application from rejected table
+		// by Akash [07-08-2023]
+
+		$stmt = $conn->execute("SELECT rj.customer_id FROM $DmiRejectedApplLogs AS rj
+								INNER JOIN (SELECT fss.customer_id, fss.created FROM $finalSubmitTable AS fss
+								INNER JOIN (SELECT max(id) id, customer_id FROM $finalSubmitTable GROUP BY customer_id) AS fs ON fs.customer_id = fss.customer_id AND fs.id = fss.id) AS fsr ON fsr.customer_id = rj.customer_id
+								INNER JOIN (SELECT max(id) id, customer_id FROM $DmiRejectedApplLogs GROUP BY customer_id) AS maxall ON maxall.customer_id = rj.customer_id AND maxall.id = rj.id 
+								WHERE rj.created > fsr.created AND rj.appl_type = '$applicationType'");
 		$results = array();
 
 		if (!empty($stmt)) {
@@ -217,13 +223,13 @@ class RandomfunctionsComponent extends Component {
 			if (substr($model,0,3)=='dmi') {
 
 				//to check if given column exist in this table
-				$stmt = $db->execute("select 1 from information_schema.columns where table_name='$each_table' and column_name='$column_name'");
+				$stmt = $db->execute("SELECT 1 FROM information_schema.columns WHERE table_name='$each_table' AND column_name='$column_name'");
 				$results = $stmt ->fetchAll();
 
 				if (!empty($results)) {
 
 					//to check if the record exist in the column value
-					$stmt1 = $db->execute("select 1 from $model where $column_name='$record_id'");
+					$stmt1 = $db->execute("SELECT 1 FROM $model WHERE $column_name='$record_id'");
 					$results1 = $stmt1 ->fetchAll();
 					if (!empty($results1)) {
 
@@ -561,6 +567,345 @@ class RandomfunctionsComponent extends Component {
 			}else{
 				return null;
 			}
+		}
+
+
+		//created common function to set variables in Grant pdf view for change flow
+		//this is to show details on grant pdf from change appl table before final esigned.
+		//29-12-2022 by Amol
+		public function setChangedDetailsForGrantPdf($customer_id,$customer_firm_data,$premises_data=null,$laboratory_data=null,$business_type=null){
+
+			$DmiChangeApplDetails = TableRegistry::getTableLocator()->get('DmiChangeApplDetails');
+			$MCommodity = TableRegistry::getTableLocator()->get('MCommodity');
+			$MCommodityCategory = TableRegistry::getTableLocator()->get('MCommodityCategory');
+			$DmiPackingTypes = TableRegistry::getTableLocator()->get('DmiPackingTypes');
+			$changeApplDetails = $DmiChangeApplDetails->sectionFormDetails($customer_id);
+
+			if (!empty($changeApplDetails[0]['firm_name'])) {//if firm name changed			
+				$customer_firm_data['firm_name'] = $changeApplDetails[0]['firm_name'];				
+			}
+			if (!empty($changeApplDetails[0]['mobile_no'])) {//if Mobile no changed	
+				$customer_firm_data['mobile_no'] = $changeApplDetails[0]['mobile_no'];
+				$customer_firm_data['email'] = $changeApplDetails[0]['email_id'];
+				$customer_firm_data['fax_no'] = $changeApplDetails[0]['phone_no'];				
+			}
+			if (!empty($changeApplDetails[0]['commodity'])) {//if commodity changed	
+				
+				// to show commodities and there selected sub-commodities
+				$sub_commodity_array = $changeApplDetails[0]['commodity'];
+
+				$i=0;
+				foreach($sub_commodity_array as $key => $value)
+				{			
+					$fetch_commodity_id = $MCommodity->find('all',array('conditions'=>array('commodity_code IS'=>$key)))->first();
+					$commodity_id[$i] = $fetch_commodity_id['category_code'];			
+					$sub_commodity_data[$i] =  $fetch_commodity_id;			
+					$i=$i+1;
+				}
+
+				$unique_commodity_id = array_unique($commodity_id);		
+				$commodity_name_list = $MCommodityCategory->find('all',array('conditions'=>array('category_code IN'=>$unique_commodity_id, 'display'=>'Y')))->toArray();
+				$this->Controller->set('commodity_name_list',$commodity_name_list);		
+				$this->Controller->set('sub_commodity_data',$sub_commodity_data);			
+			}
+			if (!empty($changeApplDetails[0]['packing_types'])) {//if Packaging material changed	for PP
+				
+				$packaging_materials = $changeApplDetails[0]['packing_types'];
+				//$packaging_types = $DmiPackingTypes->find('list', array('keyField'=>'id','valueField'=>'packing_type', 'conditions'=>array('id IN'=>$packaging_materials)))->toArray();			 
+				$this->Controller->set('packaging_types',$packaging_materials);
+			}
+			if (!empty($changeApplDetails[0]['premise_street'])) {//if premises changed	
+				
+				//first premises variables used in grant pdf viewf files, set
+				$customer_firm_data['street_address'] = $changeApplDetails[0]['premise_street'];	
+				$firm_district_name = $this->Controller->Mastertablecontent->districtValueById($changeApplDetails[0]['premise_city'])->district_name;
+				$this->Controller->set('firm_district_name',$firm_district_name);	
+				$firm_state_name = $this->Controller->Mastertablecontent->stateValueById($changeApplDetails[0]['premise_state']);
+				$this->Controller->set('firm_state_name',$firm_state_name);	
+				$customer_firm_data['postal_code'] = $changeApplDetails[0]['premise_pin'];
+				
+				//second premises variables used in grant pdf view files, set here
+				$premises_data[0]['street_address'] = $changeApplDetails[0]['premise_street'];				
+				$premises_district_name = $this->Controller->Mastertablecontent->districtValueById($changeApplDetails[0]['premise_city']);
+				$this->Controller->set('premises_district_name',$premises_district_name);				
+				$premises_state_name = $this->Controller->Mastertablecontent->stateValueById($changeApplDetails[0]['premise_state']);
+				$this->Controller->set('premises_state_name',$premises_state_name);	
+				$premises_data[0]['postal_code'] = $changeApplDetails[0]['premise_pin'];
+
+					
+			}
+			if (!empty($changeApplDetails[0]['lab_type']) && !empty($laboratory_data)) {//if Lab details changed	
+				
+				$laboratory_data[0]['laboratory_name'] = $changeApplDetails[0]['lab_name'];
+				$this->Controller->set('laboratory_data',$laboratory_data);
+
+			}
+			if (!empty($changeApplDetails[0]['business_type'])) {
+				
+				$business_type = $this->Controller->Mastertablecontent->businessTypeById($changeApplDetails[0]['business_type']);
+				$this->Controller->set('business_type',$business_type);
+				
+			}
+			//check if TBL updated
+			$DmiChangeAllTblsDetails = TableRegistry::getTableLocator()->get('DmiChangeAllTblsDetails');
+			$get_tbls_details = $DmiChangeAllTblsDetails->find('all', array('conditions'=>array('customer_id IS'=>$customer_id,'delete_status IS NULL','status IS NULL'),'order'=>'id'))->toArray();
+			if (!empty($get_tbls_details)) {
+				$added_tbls_details[1][0] = $get_tbls_details;
+				$this->Controller->set('added_tbls_details',$added_tbls_details);				
+			}
+			//check if Director details updated
+			$DmiChangeDirectorsDetails = TableRegistry::getTableLocator()->get('DmiChangeDirectorsDetails');
+			$added_directors_details = $DmiChangeDirectorsDetails->find('all', array('conditions'=>array('customer_id IS'=>$customer_id,'delete_status IS NULL','status IS NULL'),'order'=>'id'))->toArray();
+			if (!empty($added_directors_details)) {	
+				$this->Controller->set('added_directors_details',$added_directors_details);				
+			}
+			
+			$this->Controller->set('premises_data',$premises_data);
+			$this->Controller->set('customer_firm_data',$customer_firm_data);
+		}
+		
+		
+		//to show changed fields or section name with updated changed, in Section III
+		//on 02-01-2023 by Amol
+		public function showChangedFieldsInGrantPdfSection($customer_id,$getNoOfAppl){
+			
+			$DmiChangeSelectedFields = TableRegistry::getTableLocator()->get('DmiChangeSelectedFields');
+			$DmiChangeApplDetails = TableRegistry::getTableLocator()->get('DmiChangeApplDetails');
+			$DmiChangeFieldLists = TableRegistry::getTableLocator()->get('DmiChangeFieldLists');
+			$DmiChangeAllTblsDetails = TableRegistry::getTableLocator()->get('DmiChangeAllTblsDetails');
+			$DmiChangeDirectorsDetails = TableRegistry::getTableLocator()->get('DmiChangeDirectorsDetails');
+			$DmiDistricts = TableRegistry::getTableLocator()->get('DmiDistricts');
+			$DmiStates = TableRegistry::getTableLocator()->get('DmiStates');
+			$DmiChangeFinalSubmits = TableRegistry::getTableLocator()->get('DmiChangeFinalSubmits');
+			$DmiChangeGrantCertificatesPdfs = TableRegistry::getTableLocator()->get('DmiChangeGrantCertificatesPdfs');
+			$DmiUsers = TableRegistry::getTableLocator()->get('DmiUsers');
+			$DmiChangeAllMachinesDetails = TableRegistry::getTableLocator()->get('DmiChangeAllMachinesDetails');
+			
+			$applCnt=0;
+			$applIdForLog=array('0');//set default 0 for no records
+			$finalSubIdForLog=array('0');//set default 0 for no records
+			$grantIdForLog=array('0');//set default 0 for no records
+			
+			$applSubmissionDate = array();
+			$certEsignedBy = array();
+			$newarr = array();
+			$change_premises = array();
+			foreach($getNoOfAppl as $each){		
+				
+
+				
+				//to get application submission date
+				$get_final_submitted_date = $DmiChangeFinalSubmits->find('all',array('conditions'=>array('customer_id IS'=>$customer_id,'id NOT IN'=>$finalSubIdForLog,'status'=>'pending'),'order'=>'id desc'))->first();
+				
+				
+				//to cert get esigned by user name
+				//applied condition on 11-04-2023, to count only final submitted appl.
+				$get_change_grant_details  = array();
+				if(!empty($get_final_submitted_date)){
+					$finalSubIdForLog[] = $get_final_submitted_date['id'];//to record ids once used
+					$applSubmissionDate[$applCnt] = $get_final_submitted_date['created'];
+					$get_change_grant_details = $DmiChangeGrantCertificatesPdfs->find('all',array('fields'=>array('id','user_email_id','created'),'conditions'=>array('customer_id IS'=>$customer_id,'id NOT IN'=>$grantIdForLog,'date(created) >'=>$get_final_submitted_date['created']),'order'=>'id desc'))->first();
+				}		
+
+				$applCond = array();
+				if(!empty($get_change_grant_details)){
+					$grantIdForLog[] = $get_change_grant_details['id'];//to record ids once used
+					
+					$get_user_details = $DmiUsers->find('all',array('conditions'=>array('email IS'=>$get_change_grant_details['user_email_id'])))->first();
+					
+					if(!empty($get_user_details)){
+						$certEsignedBy[$applCnt] = $get_user_details['f_name'].' '.$get_user_details['l_name'];
+					}else{
+						$certEsignedBy[$applCnt] = null;
+					}
+					
+					$applCond = array('date(created) <'=> $get_change_grant_details['created']);
+				}else{
+					
+					$get_user_details = $DmiUsers->find('all',array('conditions'=>array('email IS'=>$this->Session->read('username'))))->first();
+					$certEsignedBy[$applCnt] = $get_user_details['f_name'].' '.$get_user_details['l_name'];
+				}				
+				
+				//get new change details
+				$getChangeDetails[$applCnt] = $DmiChangeApplDetails->find('all',array('conditions'=>array('customer_id IS'=>$customer_id,'id NOT IN'=>$applIdForLog,$applCond),'order'=>'id desc'))->first();
+				$applIdForLog[] = $getChangeDetails[$applCnt]['id'];//to record ids once used
+
+				//get change tbl details
+				$changeTblDetails[$applCnt] = $DmiChangeAllTblsDetails->find('all',array('fields'=>'tbl_name','conditions'=>array('customer_id IS'=>$customer_id,'delete_status IS NULL','status IS NULL')))->toArray();
+				
+				//get Director details
+				$changeDirectorDetails[$applCnt] = $DmiChangeDirectorsDetails->find('all',array('fields'=>array('d_name','d_address'),'conditions'=>array('customer_id IS'=>$customer_id,'delete_status IS NULL','status IS NULL')))->toArray();
+				
+				//get Director details
+				$changeMachineDetails[$applCnt] = $DmiChangeAllMachinesDetails->find('all',array('fields'=>array('machine_name'),'conditions'=>array('customer_id IS'=>$customer_id,'delete_status IS NULL','status IS NULL')))->toArray();
+				
+				// to show changed premises details	
+				if (!empty($getChangeDetails[$applCnt]['premise_city'])) {
+					$change_district_name = $DmiDistricts->find('all',array('fields'=>'district_name','conditions'=>array('id IS'=>$getChangeDetails[$applCnt]['premise_city'])))->first();		
+					$change_state_name = $DmiStates->find('all',array('fields'=>'state_name','conditions'=>array('id IS'=>$getChangeDetails[$applCnt]['premise_state'])))->first();
+					$change_premises[$applCnt] = $getChangeDetails[$applCnt]['premise_street'].', '.$change_district_name['district_name'].', '.$change_state_name['state_name'].', '.$getChangeDetails[$applCnt]['premise_pin'];
+				}
+				
+				//for changed lab details
+				if (!empty($getChangeDetails[$applCnt]['lab_type'])) {
+
+					$DmiLaboratoryTypes = TableRegistry::getTableLocator()->get('DmiLaboratoryTypes');
+					$change_lab = $DmiLaboratoryTypes->find('all',array('fields'=>'laboratory_type','conditions'=>array('id IS'=>$getChangeDetails[$applCnt]['lab_type'])))->first();
+					$change_lab_type[$applCnt] = $change_lab['laboratory_type'];
+					$this->Controller->set('change_lab_type',$change_lab_type);
+
+				}
+				
+				//for change commodities
+				if (!empty($getChangeDetails[$applCnt]['comm_category'])) {
+					$change_commodity_array = explode(',',(string) $getChangeDetails[$applCnt]['commodity']); #For Deprecations
+					
+					$MCommodity = TableRegistry::getTableLocator()->get('MCommodity');
+					$MCommodityCategory = TableRegistry::getTableLocator()->get('MCommodityCategory');
+
+					$i=0;
+					foreach ($change_commodity_array as $sub_commodity_id)
+					{
+						$fetch_commodity_id = $MCommodity->find('all',array('conditions'=>array('commodity_code IS'=>$sub_commodity_id)))->first();
+						$commodity_id[$i] = $fetch_commodity_id['category_code'];
+						$change_sub_commodity_data[$applCnt][$i] =  $fetch_commodity_id;
+						$i=$i+1;
+					}
+
+					$unique_commodity_id = array_unique($commodity_id);
+
+					$change_commodity_name_list[$applCnt] = $MCommodityCategory->find('all',array('conditions'=>array('category_code IN'=>$unique_commodity_id, 'display'=>'Y')))->toArray();
+
+					$this->Controller->set('change_commodity_name_list',$change_commodity_name_list);
+					$this->Controller->set('change_sub_commodity_data',$change_sub_commodity_data);
+				}
+				if (!empty($getChangeDetails[$applCnt]['business_type'])) {
+				
+					$getChangeDetails[$applCnt]['business_type'] = $this->Controller->Mastertablecontent->businessTypeById($getChangeDetails[$applCnt]['business_type']);
+					
+				}
+				
+				//this if else conditionnadded on 11-04-2023, to avoid in-process change appl, details in grant cert.
+				//when appl. type is 3 in session then only in-process change appl. details will be considered.
+				if ($this->Session->read('application_type')==3){
+					//check selected fields
+					$selectedValues[$applCnt] = explode(',',$each['changefields']);
+					//get selected fields name
+					$getFieldName[$applCnt] = $DmiChangeFieldLists->find('all',array('conditions'=>array('field_id IN'=>$selectedValues[$applCnt],'form_type IS'=>'common'),'order'=>'field_id asc'))->toArray();
+					$newarr[] = $applCnt;
+					$applCnt++;
+				}else{
+					if(!empty($get_change_grant_details)){
+						//check selected fields
+						$selectedValues[$applCnt] = explode(',',$each['changefields']);
+						//get selected fields name
+						$getFieldName[$applCnt] = $DmiChangeFieldLists->find('all',array('conditions'=>array('field_id IN'=>$selectedValues[$applCnt],'form_type IS'=>'common'),'order'=>'field_id asc'))->toArray();
+						$newarr[] = $applCnt;
+						$applCnt++;
+					}
+				}
+				
+			}
+			
+
+			$this->Controller->set(compact('newarr','selectedValues','getFieldName','getChangeDetails','changeTblDetails','changeDirectorDetails','change_premises','applSubmissionDate','certEsignedBy','changeMachineDetails'));
+		}
+		
+		
+		//created fucntion to get recent appl changed details field wise on appl pdf
+		//on 17-03-2023
+		public function showChangedFieldsInApplPdf($customer_id){
+			
+			$DmiChangeSelectedFields = TableRegistry::getTableLocator()->get('DmiChangeSelectedFields');
+			$DmiChangeApplDetails = TableRegistry::getTableLocator()->get('DmiChangeApplDetails');
+			$DmiChangeFieldLists = TableRegistry::getTableLocator()->get('DmiChangeFieldLists');
+			$DmiChangeAllTblsDetails = TableRegistry::getTableLocator()->get('DmiChangeAllTblsDetails');
+			$DmiChangeDirectorsDetails = TableRegistry::getTableLocator()->get('DmiChangeDirectorsDetails');
+			$DmiDistricts = TableRegistry::getTableLocator()->get('DmiDistricts');
+			$DmiStates = TableRegistry::getTableLocator()->get('DmiStates');
+			$DmiBusinessTypes = TableRegistry::getTableLocator()->get('DmiBusinessTypes');
+			$DmiChangeAllMachinesDetails = TableRegistry::getTableLocator()->get('DmiChangeAllMachinesDetails');
+			$DmiPackingTypes = TableRegistry::getTableLocator()->get('DmiPackingTypes');
+			
+			//check selected fields
+			$selectedfields = $DmiChangeSelectedFields->selectedChangeFields();
+			$selectedValues = $selectedfields[0];
+			
+			//get selected fields name
+			$getFieldName = $DmiChangeFieldLists->find('all',array('conditions'=>array('field_id IN'=>$selectedValues,'form_type'=>'common'),'order'=>'field_id asc'))->toArray();
+			
+			//get new change details
+			$getChangeDetails = $DmiChangeApplDetails->find('all',array('conditions'=>array('customer_id IS'=>$customer_id),'order'=>'id desc'))->first();
+			
+			//get change tbl details
+			$changeTblDetails = $DmiChangeAllTblsDetails->find('all',array('fields'=>'tbl_name','conditions'=>array('customer_id IS'=>$customer_id,'delete_status IS NULL','status IS NULL')))->toArray();
+			
+			//get Director details
+			$changeDirectorDetails = $DmiChangeDirectorsDetails->find('all',array('fields'=>array('d_name','d_address'),'conditions'=>array('customer_id IS'=>$customer_id,'delete_status IS NULL','status IS NULL')))->toArray();
+			
+			//get Director details
+			$changeMachineDetails = $DmiChangeAllMachinesDetails->find('all',array('fields'=>array('machine_name'),'conditions'=>array('customer_id IS'=>$customer_id,'delete_status IS NULL','status IS NULL')))->toArray();
+			
+			// to show changed premises details	
+			$change_premises = '';
+			if (!empty($getChangeDetails['premise_city'])) {
+				$change_district_name = $DmiDistricts->find('all',array('fields'=>'district_name','conditions'=>array('id IS'=>$getChangeDetails['premise_city'])))->first();		
+				$change_state_name = $DmiStates->find('all',array('fields'=>'state_name','conditions'=>array('id IS'=>$getChangeDetails['premise_state'])))->first();
+				$change_premises = $getChangeDetails['premise_street'].', '.$change_district_name['district_name'].', '.$change_state_name['state_name'].', '.$getChangeDetails['premise_pin'];
+			}
+			
+			//for changed lab details
+			if (!empty($getChangeDetails['lab_type'])) {
+
+				$DmiLaboratoryTypes = TableRegistry::getTableLocator()->get('DmiLaboratoryTypes');
+				$change_lab = $DmiLaboratoryTypes->find('all',array('fields'=>'laboratory_type','conditions'=>array('id IS'=>$getChangeDetails['lab_type'])))->first();
+				$change_lab_type = $change_lab['laboratory_type'];
+				$this->Controller->set('change_lab_type',$change_lab_type);
+				
+			}
+			
+			//for change commodities
+			if (!empty($getChangeDetails['comm_category'])) {
+				$change_commodity_array = explode(',',(string) $getChangeDetails['commodity']); #For Deprecations
+				
+				$MCommodity = TableRegistry::getTableLocator()->get('MCommodity');
+				$MCommodityCategory = TableRegistry::getTableLocator()->get('MCommodityCategory');
+
+				$i=0;
+				foreach ($change_commodity_array as $sub_commodity_id)
+				{
+					$fetch_commodity_id = $MCommodity->find('all',array('conditions'=>array('commodity_code IS'=>$sub_commodity_id)))->first();
+					$commodity_id[$i] = $fetch_commodity_id['category_code'];
+					$change_sub_commodity_data[$i] =  $fetch_commodity_id;
+					$i=$i+1;
+				}
+
+				$unique_commodity_id = array_unique($commodity_id);
+
+				$change_commodity_name_list = $MCommodityCategory->find('all',array('conditions'=>array('category_code IN'=>$unique_commodity_id, 'display'=>'Y')))->toArray();
+
+				$this->Controller->set('change_commodity_name_list',$change_commodity_name_list);
+				$this->Controller->set('change_sub_commodity_data',$change_sub_commodity_data);
+			}
+
+			//for change commodities
+			if (!empty($getChangeDetails['packing_types'])) {
+
+				$packaging_materials = explode(',',(string) $getChangeDetails['packing_types']); #For Deprecations
+				$packaging_types = $DmiPackingTypes->find('all', array('fields'=>'packing_type', 'conditions'=>array('id IN'=>$packaging_materials)))->toArray();			 
+				$this->Controller->set('packaging_types',$packaging_types);
+			}
+			
+			//for change commodities
+			if (!empty($getChangeDetails['business_type'])) {
+				
+				$get_business_type = $DmiBusinessTypes->find('all',array('fields'=>'business_type','conditions'=>array('id IS'=>$getChangeDetails['business_type'])))->first();
+				$change_business_type = $get_business_type['business_type'];
+				$this->Controller->set('change_business_type',$change_business_type);
+				
+			}
+			
+			$this->Controller->set(compact('customer_id','selectedValues','getFieldName','getChangeDetails','changeTblDetails','changeDirectorDetails','change_premises','changeMachineDetails'));
 		}
 
 

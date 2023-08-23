@@ -239,6 +239,16 @@ class MastersController extends AppController {
 			$this->masterAddTitle = 'Add Documents Type';
 			$this->masterEditTitle = 'Edit Documents Type';
 			$this->fieldNameForCheck = 'document_type';
+		
+		//[ 20 For routin Inspections Master ] -> Shankhpal [06-12-2022]
+		} elseif ($masterId=='20') {
+
+			$this->masterTable = 'DmiRoutineInspectionPeriod';
+			$this->masterListTitle = 'Routine Inspection Period (Month)';
+			$this->masterListHeader = 'Routine Inspection';
+			$this->masterAddTitle = 'Add Month';
+			$this->masterEditTitle = 'Edit Month';
+			$this->fieldNameForCheck = 'routin_month';
 		}
 	
 	}
@@ -405,6 +415,7 @@ class MastersController extends AppController {
 		$this->loadModel('DmiUserRoles');
 		$this->loadModel('DmiStates');
 		$this->loadModel('DmiDistricts');
+		$this->loadModel('DmiRoutineInspectionPeriod');
 		$form_id = '';
 
 		if (!empty($masterTable)) {
@@ -540,7 +551,13 @@ class MastersController extends AppController {
 			$unit = $this->DmiReplicaUnitDetails->find('list',array('keyField'=>'id','valueField'=>'sub_unit','conditions'=>array('delete_status IS NULL')))->toArray();
 			//Set the All Varibles
 			$this->set(compact('commodity_categories','unit'));
-		}
+	
+		}elseif($masterId == '20'){
+			  
+			$this->loadModel('DmiCertificateTypes');
+        		$certificate_type = $this->DmiCertificateTypes->find('list',array('valueField'=>'certificate_type','conditions'=>array()))->toArray();
+		    	$this->set('certificate_type',$certificate_type);
+		} 
 
 
 		//when POST data sent from Form
@@ -835,6 +852,25 @@ class MastersController extends AppController {
 
 			//Set the All Varibles
 			$this->set(compact('commodity_categories','entered_commodity','entered_charge','entered_qty','selected_unit','replica_code','masterEditTitle','masterListHeader'));
+	
+	
+		// For Routine Inspection -> Shankhpal Shende [06/12/2022]
+		}elseif($masterId == '20'){
+
+			$this->loadModel('DmiRoutineInspectionPeriod');
+			$form_id = 'edit_period';
+			$period_id = $this->Session->read('record_id');
+			//period added for master of routine inspection -> shankhpal 16/05/2023
+			// updated period of master by shankhpal shende on 17/05/2023
+			$period_rti = array('0'=>'0','1'=>'1','2'=>'2','3'=>'3','4'=>'4','5'=>'5','6'=>'6','7'=>'7','8'=>'8','9'=>'9','10'=>'10','11'=>'11','12'=>'12');
+			$this->set('period_rti',$period_rti);
+				
+			$this->loadModel('DmiCertificateTypes');
+			$certificate_type = $this->DmiCertificateTypes->find('list',array('valueField'=>'certificate_type','conditions'=>array()))->toArray();
+			$this->set('certificate_type',$certificate_type);
+					
+			$period_details = $this->DmiRoutineInspectionPeriod->find('all',array('conditions'=>array('id IS'=>$period_id)))->first();
+			$this->set(compact('period_details'));
 		}
 
 
@@ -1273,6 +1309,17 @@ class MastersController extends AppController {
 				$this->message = 'You have '.$action_var.' Documents Type Successfully.';
 				$this->message_theme = 'success';
 			}
+		
+		// For Routine Inspection -> Shankhpal Shende [06/12/2022]
+		} elseif ($masterId=='20') {
+			 
+			 if ($this->Mastertablecontent->addEditPeriodMaster($postData,$record_id)) {
+
+				///Added this call to save the user action log on 21-02-2022 by Akash
+				$this->Customfunctions->saveActionPoint('Routine Inspection Period Master '."($forActionLog)", 'Success');
+				$this->message = 'You have '.$action_var.' Period Successfully.';
+				$this->message_theme = 'success';
+			}
 		}
 
 		if ($this->message == '') {
@@ -1453,17 +1500,17 @@ class MastersController extends AppController {
 
 								//update RO ids in current position table, with RO Officer change
 								$this->$current_position_model->updateAll(array('current_user_email_id'=>"$incharge_email"),
-								array('customer_id'=>$customer_id,'current_level'=>'level_3','current_user_email_id'=>$each_appl['level_3']));
+								array('customer_id IS'=>$customer_id,'current_level IS'=>'level_3','current_user_email_id IS'=>$each_appl['level_3']));
 
 								//update RO on level_4_ro column for SO flow, only when RO office Updated
 								if ($office_type=='RO') {
 
 									$this->$allocation_model->updateAll(array('level_4_ro'=>"$incharge_email"),
-									array('customer_id'=>$customer_id,'level_4_ro'=>$each_appl['level_3']));
+									array('customer_id IS'=>$customer_id,'level_4_ro IS'=>$each_appl['level_3']));
 
 									//to update position on level 4 Ro
 									$this->$current_position_model->updateAll(array('current_user_email_id'=>"$incharge_email"),
-									array('customer_id'=>$customer_id,'current_level'=>'level_4_ro','current_user_email_id'=>$each_appl['level_4_ro']));
+									array('customer_id IS'=>$customer_id,'current_level IS'=>'level_4_ro','current_user_email_id IS'=>$each_appl['level_4_ro']));
 								}
 							}
 						}

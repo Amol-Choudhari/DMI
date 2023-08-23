@@ -240,23 +240,24 @@
 			$final_report_table = TableRegistry::getTableLocator()->get($final_report_table);
 			$creat_array = null;
 			$username = $this->Session->read('username');
-			$grantDateCondition = $this->Customfunctions->returnGrantDateCondition($customer_id);
+			$grantDateCondition = $this->Customfunctions->returnGrantDateCondition($customer_id,$appl_type_id);//added new parameter in call "$appl_type_id" on 14-04-2023
 			
 			//Check if the Application is pending after grant.
 			$checkIfApplAfterGrant =  $final_submit_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id,$grantDateCondition,'status'=>'pending'),'order'=>'id DESC'))->first();
 			
 			#This if block is added because some application are showing in the Pending even after grant.
 			#This is applied to all block to avoid the application those are havent pending  - Akash [16-03-2023]
-			if (!empty($checkIfApplAfterGrant)) {
+			//if (!empty($checkIfApplAfterGrant)) {
 				//for pending reports
 				if($for_status == 'pending') { 
 					$check_final_reported = $final_submit_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id,'status'=>'approved','OR'=>array('current_level IN'=>array('level_2','level_3')),$grantDateCondition)))->first();		
 					
-					if (empty($check_final_reported)) {
+					//added $appl_type_id = 10 for routine inspection list by shankhpal shende on 18/05/2023
+					if (empty($check_final_reported) || $appl_type_id == '10') {
 						$creat_array = $each_alloc['modified'];
 					}
 				}
-			}
+			//}
 			
 			$check_last_status = $this->Controller->Customfunctions->finalSubmitDetails($customer_id,'inspection_report',$appl_type_id);
 			
@@ -431,7 +432,7 @@
 					$approvedConditions = "al.level_3 = '$username'";
 				}
 				
-				//print_r($appl_type_id);
+				
 				$stmt = $conn->execute("select al.*,fsr.modified as tradate from $allocationTable as al
 										inner join (select fss.customer_id, fss.status , fss.current_level, fss.modified from $finalSubmitTable as fss
 										inner join (select max(id) id, customer_id from $finalSubmitTable group by customer_id) as fs on fs.customer_id = fss.customer_id and fs.id = fss.id) as fsr on fsr.customer_id = al.customer_id and fsr.status = 'approved'
@@ -531,8 +532,10 @@
 			$applCurrentPosTable = strtolower(implode('_',array_filter(preg_split('/(?=[A-Z])/',$appl_current_pos_table))));
 			$creat_array = false;
 			$username = $this->Session->read('username');
-			
-			if ($appl_type_id == 2) {
+
+			#This below condition block is modified.
+			# -> To allow the listing of the Surrender Flow the application_type = 9 is added to the block - Akash[05-12-2022]
+			if ($appl_type_id == 2 || $appl_type_id == 3 || $appl_type_id == 9) {//added temp for all change flow to avoid level 2 check, on 14-04-2023
 				$level2 = null;
 			} else {
 				$level2 = "and al.level_2 IS NOT NULL";
@@ -766,9 +769,26 @@
 
 			//added condition for lab export, as there will be no siteinspection, so default set to true
 			//29-09-2021 by Amol
+			
+			$flagToShowApplWOReport = null;//new common flag to use in below conditions 
 			if($split_customer_id[1]==3 && ($export_unit_status == 'yes' || $NablDate != null)){//updated on 30-09-2021
 
 				$all_report_status = 'true';
+				$flagToShowApplWOReport = 'yes';
+			
+			//The Below code is added for appl 9 : Surrender Flow to avoid the site inspection- Akash[02-12-2022]
+			}elseif($appl_type_id == 9){ 
+				$all_report_status = 'true';
+				$flagToShowApplWOReport = 'yes';
+			
+			//added condition on 24-05-2023 by Amol for change flow
+			}elseif($appl_type_id == 3){ 
+				$changeInspection = $this->Controller->Customfunctions->inspRequiredForChangeApp($customer_id,$appl_type_id);
+				if($changeInspection=='no'){
+					$all_report_status = 'true';
+					$flagToShowApplWOReport = 'yes';
+				}
+				
 			}
 
 			if($this->Session->read('username') == $office_email_id)
@@ -783,8 +803,10 @@
 						
 						$this->Session->write('ho_comments_readonly','yes');
 						
-						//to get list of lab export appln allocated to HO without Report.					
-						if($split_customer_id[1]==3 && empty($find_id_list) && ($export_unit_status == 'yes' || $NablDate != null))
+						//to get list of lab export appln allocated to HO without Report.
+						//commented condition and used common flag as set from above, on 24-05-2023 by Amol					
+						if(/*$split_customer_id[1]==3 && empty($find_id_list) && ($export_unit_status == 'yes' || $NablDate != null)*/
+							$flagToShowApplWOReport == 'yes')
 						{											
 							$check_if_commented = $ho_comments_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id,'to_user'=>'ro')))->first();
 
@@ -815,8 +837,10 @@
 				elseif($for_status == 'ref_back'){
 					
 					$this->Session->write('ho_comments_readonly','yes');
-					//to get list of lab export appln allocated to HO without Report.					
-					if($split_customer_id[1]==3 && empty($find_id_list) && ($export_unit_status == 'yes' || $NablDate != null))
+					//to get list of lab export appln allocated to HO without Report.
+					//commented condition and used common flag as set from above, on 24-05-2023 by Amol					
+					if(/*$split_customer_id[1]==3 && empty($find_id_list) && ($export_unit_status == 'yes' || $NablDate != null)*/
+						$flagToShowApplWOReport == 'yes')
 					{
 						$check_if_commented = $ho_comments_table->find('list',array('conditions'=>array('customer_id IS'=>$customer_id,'to_user'=>'ro')))->toList();
 						
@@ -874,7 +898,9 @@
 					if(!empty($app_current_pending) && $all_report_status=='true'){
 						
 						//to get list of lab export appln allocated to HO without Report.
-						if($split_customer_id[1]==3 && empty($find_id_list) && ($export_unit_status == 'yes' || $NablDate != null))
+						//commented condition and used common flag as set from above, on 24-05-2023 by Amol	
+						if(/*$split_customer_id[1]==3 && empty($find_id_list) && ($export_unit_status == 'yes' || $NablDate != null)*/
+							$flagToShowApplWOReport == 'yes')
 						{
 							$check_if_commented = $ho_comments_table->find('list',array('conditions'=>array('customer_id IS'=>$customer_id,'to_user'=>'ro')))->toList();
 							
@@ -900,7 +926,8 @@
 							//now getting applications by "from_user" & "to_user" either "comment_by/comment_to"
 							$check_if_commented = $ho_comments_table->find('list',array('conditions'=>array('customer_id IS'=>$customer_id,'to_user'=>'ro')))->toList();
 						
-							if(!empty($check_if_commented) && $find_app_max_status['status']=='approved')
+							//added !empty($find_app_max_status) on 09-08-2023 by Amol to avoid undefined offset error
+							if(!empty($check_if_commented) && !empty($find_app_max_status) && $find_app_max_status['status']=='approved')
 							{	
 								//now getting applications by "from_user" & "to_user" either "comment_by/comment_to"
 								$check_comment_to_status = 	$ho_comments_table->find('all',array('conditions'=>array('id >'=>max($check_if_commented),
@@ -954,7 +981,7 @@
 		
 			$final_submit_status = $this->Controller->Customfunctions->finalSubmitDetails($customer_id,'application_form',$appl_type_id);
 			
-			$grantDateCondition = $this->Controller->Customfunctions->returnGrantDateCondition($customer_id);
+			$grantDateCondition = $this->Controller->Customfunctions->returnGrantDateCondition($customer_id,$appl_type_id);//added appl_type parameter on 25-04-2023, to manage flow wise condition
 				
 			$app_current_pending = $appl_current_pos_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id,'current_user_email_id'=>$username,$grantDateCondition),'order'=>array('id DESC')))->first();
 			
@@ -1074,6 +1101,16 @@
 			$ho_comments_table = $flow_wise_table['ho_comment_reply'];
 			$appl_current_pos_table = $flow_wise_table['appl_current_pos'];
 			$DmiMoRoCommentsDetails = $flow_wise_table['commenting_with_mo'];
+			
+			//below code added on 17-08-2023 by Amol, (note: not for routine insp. appl type 10)
+			//to check if their is any appl after grant, then move for further logic, else return empty array
+			//to avoid listing of any applications in the dashboard after grant.
+			if($appl_type_id!=10){
+				$grantDateCondition = $this->Controller->Customfunctions->returnGrantDateCondition($customer_id,$appl_type_id);
+				$final_submit_table_new = TableRegistry::getTableLocator()->get($final_submit_table);
+				$checkLastApplDate = $final_submit_table_new->find('all',array('conditions'=>array('customer_id IS'=>$customer_id,$grantDateCondition)))->first();
+				if(empty($checkLastApplDate)){ $list_array=array(); return $list_array;}
+			}
 
 			//get_form_type
 			$form_type = $this->Controller->Customfunctions->checkApplicantFormType($customer_id);
@@ -1087,7 +1124,14 @@
 			$appl_view_link = '../scrutiny/form_scrutiny_fetch_id/'.$firm_table_id.'/view/'.$appl_type_id;
 			$appl_edit_link = '../scrutiny/form_scrutiny_fetch_id/'.$firm_table_id.'/edit/'.$appl_type_id;
 			$comm_with_email = null;
-	
+			
+			//default set to 1 to open application sections added by shankhapal shende on 30/06/2023
+			//for module RTI
+			
+			if($appl_type_id == 10){
+				//Added default 1 for opening application when Application type =10
+				$appl_view_link = '../scrutiny/form_scrutiny_fetch_id/'.$firm_table_id.'/view/1';
+			}
 			//extra conditional stuff
 			if($for_level=='pao'){
 				$comm_with = 'Applicant';

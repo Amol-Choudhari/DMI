@@ -128,6 +128,11 @@ class CustomerformsController extends AppController{
 		$added_firms = $this->DmiFirms->find('all',array('conditions'=>array('customer_id IS'=>$firm_id)))->toArray();					
 		$added_firm_field = $added_firms[0];
 		
+		#This variables and function is added to check the firm is surrender , if surrendered block the update button
+		#For Surrender Flow - Akash [14-04-2023]
+		$isSurreder = $this->Customfunctions->isApplicationSurrendered($firm_id);
+		$this->set('isSurreder',$isSurreder);
+
 		//get personal details masked by custom function to show in secure mode
 		//applied on 12-10-2017 by Amol
 		$added_firms[0]['mobile_no'] = $this->Customfunctions->getMaskedValue(base64_decode($added_firms[0]['mobile_no']),'mobile'); //This is addded on 27-04-2021 for base64decoding by AKASH

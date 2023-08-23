@@ -18,6 +18,7 @@
 	//conditionally calling pdf creation function for CA/printing/Lab report
 	$controller_name = 'applicationformspdfs';
 	$grant_pdf = $section_details['grant_pdf'];		
+	
 ?>
 
 

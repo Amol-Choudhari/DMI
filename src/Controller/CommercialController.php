@@ -102,7 +102,6 @@ class CommercialController extends AppController{
 		}
 
 
-		//pr($paymemtReplied); exit;
 		$this->set('payment_pendingList',$paymentPendingList);
 		$this->set('payment_notconfirmed',$paymentNotconfirmed);
 		$this->set('paymemt_replied',$paymemtReplied);

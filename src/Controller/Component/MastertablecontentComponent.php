@@ -1463,6 +1463,44 @@ class MastertablecontentComponent extends Component {
 
 	}
 
+
+	// For Adding and Editing the Routin Inspection (RTI) Period Master added on 06/12/2022 by shankhpal shende
+	public function addEditPeriodMaster($postData,$record_id=null){
+	
+		$username = $this->Session->read('username');
+		$DmiRoutineInspectionPeriod = TableRegistry::getTableLocator()->get('DmiRoutineInspectionPeriod');
+
+		//html encoding
+		$firm_type = htmlentities($postData['firm_type'], ENT_QUOTES);
+		$period = htmlentities($postData['period'], ENT_QUOTES);
+
+		//edit array
+		if($record_id == null){
+
+			$data_array = array(
+							'firm_type'=>$firm_type,
+							'period'=>$period,
+							'user_email_id'=>$username,
+							'created'=>date('Y-m-d H:i:s'),
+							'modified'=>date('Y-m-d H:i:s'));
+		}else{
+
+			$data_array = array('id'=>$record_id,
+						'firm_type'=>$firm_type,
+						'period'=>$period,
+						'user_email_id'=>$username,
+						'created'=>date('Y-m-d H:i:s'),
+						'modified'=>date('Y-m-d H:i:s'));
+		}
+
+		$entity = $DmiRoutineInspectionPeriod->newEntity($data_array);
+
+		if ($DmiRoutineInspectionPeriod->save($entity)) {
+
+			return true;
+		}
+	}
+
 }
 
 

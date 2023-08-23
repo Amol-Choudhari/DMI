@@ -27,7 +27,7 @@ class ReplicaController extends AppController {
 
 	public function beforeFilter($event) {
 
-		parent::beforeFilter($event);	
+		parent::beforeFilter($event);
 
 		$customer_last_login = $this->Customfunctions->customerLastLogin();
 		$this->set('customer_last_login', $customer_last_login);
@@ -1224,6 +1224,11 @@ class ReplicaController extends AppController {
 
 		$pdf_date = date('d-m-Y');
 
+		//added code to get validity date for next 6 months from issue
+		//on 21-08-2023 by Amol
+		$validUptoDate = date('d/m/Y', strtotime("+6 months", strtotime($pdf_date)));
+		$this->set('validUptoDate',$validUptoDate);
+
 		$data = [$chemist_name,$firm_details['customer_id'],$firm_details['firm_name'],$pdf_date,$region];
 		$result_for_qr = $this->Customfunctions->getQrCode($data,'CHM');
 
@@ -1362,7 +1367,13 @@ class ReplicaController extends AppController {
 			//update allotment status to 1 in replica allotment table
 			
 			$date = date('Y-m-d H:i:s');
-			$this->DmiReplicaAllotmentDetails->updateAll(array('allot_status'=>"1",'modified'=>"$date",'version'=>"$current_pdf_version"),array('customer_id IS'=>$customer_id,'allot_status IS Null','delete_status IS Null'));
+
+			//added code to get validity date for next 6 months from issue
+			//on 21-08-2023 by Amol
+			$validUptoDate = date('Y-m-d', strtotime("+6 months", strtotime($date)));
+
+			//updated query with new field "valid_upto" on 21-08-2023 by Amol
+		$this->DmiReplicaAllotmentDetails->updateAll(array('allot_status'=>"1",'modified'=>"$date",'version'=>"$current_pdf_version"/*,'valid_upto'=>"$validUptoDate"*/),array('customer_id IS'=>$customer_id,'allot_status IS Null','delete_status IS Null'));
 		
 			
 		}

@@ -135,21 +135,32 @@ class ScrutinyController extends AppController{
 			$this->Customfunctions->showOldCertDetailsPopup($customer_id);
 		}
 
-		$changefields = array();
+		//commented on 13-04-2023 as per change updates
+		/*$changefields = array();
 		if($application_type == 3){
 
 			$this->changeApplication();
 			$changefields = $this->Session->read('changefield');
 		}
-		$this->set('changefields',json_encode($changefields));
+		$this->set('changefields',json_encode($changefields));*/
 
-		$selectedSections = array();
+		/*$selectedSections = array();
 		if($application_type == 3){
 			$this->loadModel('DmiChangeSelectedFields');
 			$selectedfields = $this->DmiChangeSelectedFields->selectedChangeFields();
 			$selectedSections = $selectedfields[2];
 		}
-		$this->set('selectedSections',$selectedSections);
+		$this->set('selectedSections',$selectedSections);*/
+		//commented above code and added below one for change module
+		//on 13-04-2023 by Amol
+		if($application_type == 3){
+			
+			$this->changeApplication();
+			$this->loadModel('DmiChangeSelectedFields');
+			$selectedfields = $this->DmiChangeSelectedFields->selectedChangeFields();
+			$selectedValues = $selectedfields[0];
+			$this->set('selectedValues',$selectedValues);
+		}
 
 		if($oldapplication == 'yes' && $application_type == 1){
 
@@ -209,13 +220,13 @@ class ScrutinyController extends AppController{
 
 		$final_submit_details = $this->Customfunctions->finalSubmitDetails($customer_id,'application_form');
 		$this->set('final_submit_details',$final_submit_details);
-	
+
 		$ca_bevo_applicant = $this->Customfunctions->checkCaBevo($customer_id);
 		$this->set('ca_bevo_applicant',$ca_bevo_applicant);
 
 		$applicant_type = $this->Customfunctions->checkFatSpreadOrBevo($customer_id);//call fucntion to check bevo or fat spread
 		$this->set('applicant_type',$applicant_type);
-		
+
 		if($form_type=='F' && $ca_bevo_applicant=='yes'){
 			$form_type='E';
 		}
@@ -249,6 +260,9 @@ class ScrutinyController extends AppController{
 
 		$this->set('firm_details',$firm_details);
 
+		//added this method call on 13-04-2023 to commoity and packing types details
+		$this->Randomfunctions->getCommodityDetails($firm_details,$firm_type);
+																					   
 		$Dmi_flow_wise_tables_list = TableRegistry::getTableLocator()->get('DmiFlowWiseTablesLists');
 		$Dmi_final_submit_tb = $Dmi_flow_wise_tables_list->find('all',array('conditions'=>array('application_type IS'=>$application_type)))->first();
 
@@ -266,15 +280,15 @@ class ScrutinyController extends AppController{
 		
 		// get all section all details
 		$allSectionDetails = $this->DmiCommonScrutinyFlowDetails->allSectionList($application_type,$office_type,$firm_type,$form_type);
-		
+
 		$section_model = $section_details['section_model'];
 		$section = $section_details['section_name'];
 		$this->set('section',$section);
-		
+
 		// get section details
 		$this->loadModel($section_model);
 		$section_form_details = $this->$section_model->sectionFormDetails($customer_id);
-	
+
 		// if return value 1 (all forms saved), return value 2 (all forms approved), return value 0 (all forms not saved or approved)
 		$all_section_status = $this->Customfunctions->formStatusValue($allSectionDetails,$customer_id);
 
@@ -283,6 +297,22 @@ class ScrutinyController extends AppController{
 		$this->set('previousbtnid',$nextPreviousBtn[0]);
 		$this->set('nextbtnid',$nextPreviousBtn[1]);
 
+
+
+		//added below query on 27-07-2023 by Akash
+		//to handle cases like when appl. refereed back from HO, RO comments to appicant and applicant replied.
+		//now when RO again scrutinized the applicant replies, then no need to again enter records in HO allocation table as pending.
+		//RO will comment back from HO inspection comments window.
+		$Dmi_ho_allocation = TableRegistry::getTableLocator()->get($Dmi_final_submit_tb['ho_level_allocation']);
+		$checkHoAllocationEntry = $Dmi_ho_allocation->find('all',array('conditions'=>array('customer_id IS'=>$customer_id, $grantDateCondition),'order'=>'id DESC'))->first();
+		$this->set('checkHoAllocationEntry',$checkHoAllocationEntry);
+
+		//This method and variable is to check if the inspection is required or not for perticular application
+		//It will used to check the condition at element button "Forward To" from ro_mo_applicant_communication .
+		//This added to resolve the button appearing when the form scrutiny is opened from ho communication
+		// Akash Thakre [28-07-2023]
+		$isSiteInspectionRequired = $this->Customfunctions->isSiteInspectionRequired($customer_id,$application_type);
+		$this->set('isSiteInspectionRequired',$isSiteInspectionRequired);
 
 		if(!empty($final_submit_details)){
 			$final_submit_status = $final_submit_details['status'];
@@ -425,7 +455,7 @@ class ScrutinyController extends AppController{
 		}
 		//End code for Edit/Delete options For RO on Communication with Applicant.
 
-		// Saved referredback comments in chemist flow, Done Aakash Thakare 30-09-2021
+		// Saved referredback comments in chemist flow, Done Akash [30-09-2021]
 		if(null!==($this->request->getData('che_ro_referred_back'))){
 
 			$result = $this->Communication->singleWindowReferredback($this->request->getData(),$allSectionDetails);
@@ -576,7 +606,7 @@ class ScrutinyController extends AppController{
 			//called this component to optimized code on 02-04-2018
 
 			$result = $this->Romoioapplicantcommunicationactions->ROScrutinizedATMOLevel($customer_id,$section_model,$section_form_details[0],$allSectionDetails);
-
+			
 			if($result == 1 && $oldapplication=='yes' && ($application_type==1 || $application_type==6)){//added appl type 6 cond. on 23-11-2021
 
 				$this->Romoioapplicantcommunicationactions->ROScrutinizedOldApplication($customer_id);
@@ -594,53 +624,41 @@ class ScrutinyController extends AppController{
 				//applied on 29-09-2021 by Amol
 				$NablDate = $this->Randomfunctions->checkIfLabNablAccreditated($customer_id);
 
+				//added on 13-04-2023 by Amol, to check if appl is for change and having Inspection or not
+				$changeInspection = $this->Customfunctions->inspRequiredForChangeApp($customer_id,$application_type);
+
 				//applied this condition for lab export, on 01-09-2017 by Amol
 				//if all Sections scrutinized then stay on same page and show forward to HO btn directly
-				if((($export_unit_status == 'yes' || $NablDate != null) && $firm_type == 3 ) 
-				 	|| ($firm_type == 3 && $export_unit_status == 'yes' && $application_type == 8)){  // # If Block Statement Updated for the Application Type 8 (ADP Flow)- Shankhpal [17/11/2022] #Reason : 
+				// # If Block Statement Updated for the Application Type 8 (ADP Flow)- Shankhpal [17/11/2022]
 
-					//this HO level allocation applied for lab export application
-					//on 02-09-2017 by Amol
-					$find_dy_ama_user = $this->DmiUserRoles->find('all',array('fields'=>'user_email_id','conditions'=>array('dy_ama'=>'yes','OR'=>array('super_admin IS NULL','super_admin'=>'no'))))->first();
-					$dy_ama_email_id = $find_dy_ama_user['user_email_id'];
+				if(
+					(($export_unit_status == 'yes' || $NablDate != null) && $firm_type == 3 ) ||  # for the lab export
+					($firm_type == 3 && $export_unit_status == 'yes' && $application_type == 8) || # for the routine inspection
+					($application_type == 9 && $firm_type == 3)  # for the surrender application if firm is lab - Akash [17-08-2023]
+				){
 
-					$find_jt_ama_user = $this->DmiUserRoles->find('all',array('fields'=>'user_email_id','conditions'=>array('jt_ama'=>'yes','OR'=>array('super_admin IS NULL','super_admin'=>'no'))))->first();;
-					$jt_ama_email_id = $find_jt_ama_user['user_email_id'];
-
-
-					$find_ama_user = $this->DmiUserRoles->find('all',array('fields'=>'user_email_id','conditions'=>array('ama'=>'yes','OR'=>array('super_admin IS NULL','super_admin'=>'no'))))->first();;
-					$ama_email_id = $find_ama_user['user_email_id'];
-
-					$Dmi_ho_allocation = TableRegistry::getTableLocator()->get($Dmi_final_submit_tb['ho_level_allocation']);
-					$Dmi_all_applications_current_position = TableRegistry::getTableLocator()->get($Dmi_final_submit_tb['appl_current_pos']);
-
-					$Dmi_ho_allocation_entity = $Dmi_ho_allocation->newEntity(array(
-
-						'customer_id'=>$customer_id,
-						'dy_ama'=>$dy_ama_email_id,
-						'jt_ama'=>$jt_ama_email_id,
-						'ama'=>$ama_email_id,
-						'current_level'=>$dy_ama_email_id,
-						'created'=>date('Y-m-d H:i:s'),
-						'modified'=>date('Y-m-d H:i:s')
-
-					));
+					//For the Lab export
+					$result = $this->Romoioapplicantcommunicationactions->ifApplicationIsExport($customer_id,$application_type,$checkHoAllocationEntry);
 					
-					if($Dmi_ho_allocation->save($Dmi_ho_allocation_entity)){
-
-						//Update record in all applications current position table
-						//created and applied on 02-09-2017 by amol
-						$customer_id = $customer_id;
-						$user_email_id = $dy_ama_email_id;
-						$current_level = 'level_4';
-						$Dmi_all_applications_current_position->currentUserUpdate($customer_id,$user_email_id,$current_level);//call to custom function from model
-
-						#SMS: RO forwarded to HO
-						$this->DmiSmsEmailTemplates->sendMessage(20,$customer_id);
-					}
-
+					$this->DmiSmsEmailTemplates->sendMessage(20,$customer_id); #SMS: RO forwarded to HO
 					$this->Customfunctions->saveActionPoint('All Section Scrutinized', 'Success'); #Action
-					$message = $firm_type_text." - All sections scrutinized and forwarded to HO successfully";
+
+					if ($result == 1) {
+						$message = $firm_type_text." - All sections scrutinized and forwarded to HO successfully";
+					} elseif ($result == 2) {
+						$message = $firm_type_text." - All sections scrutinized, Please comment back to HO";
+					}
+					
+					$message_theme = "success";
+					$redirect_to = "../dashboard/home";
+				
+				//For Surrender application = 9 with no Site Inspection forward to RO.
+				}elseif($application_type==9 || ($application_type==3 && $changeInspection=='no')){//updated condition 21-12-2022 for change flow
+
+					//For Surrender Application
+					$this->Romoioapplicantcommunicationactions->afterScrutinyForwardToRo($customer_id,$application_type,$grantDateCondition,$Dmi_allocation_table,$Dmi_appl_current_pos_table);
+					$this->Customfunctions->saveActionPoint('All Section Scrutinized and Sent to the RO', 'Success'); #Action
+					$message = $firm_type_text." - All sections scrutinized and forwarded to RO successfully";
 					$message_theme = "success";
 					$redirect_to = "../dashboard/home";
 
@@ -823,6 +841,23 @@ class ScrutinyController extends AppController{
 			$list_applicant_payment_id = $this->$payment_table->find('list', array('valueField'=>'id','conditions'=>array('customer_id IS'=>$customer_id)))->toArray();
 			if(!empty($list_applicant_payment_id)){ $process_query = 'Updated'; }else{ $process_query = 'Saved'; }
 
+			//condition added for change module
+			//to get changed commodities or packing types if applied in change
+			//on 13-04-2023 by Amol
+			if ($application_type == 3) {
+				$this->loadModel('DmiChangeApplDetails');
+				$getChangeDetails = $this->DmiChangeApplDetails->find('all',array('fields'=>array('commodity','packing_types'),'conditions'=>array('customer_id IS'=>$customer_id),'order'=>'id desc'))->first();
+				if (!empty($getChangeDetails)) {
+					if (!empty($getChangeDetails['commodity'])){
+						$firm_details['sub_commodity'] = $getChangeDetails['commodity'];
+					}
+					elseif (!empty($getChangeDetails['packing_types'])) {
+						$firm_details['packaging_materials'] = $getChangeDetails['packing_types'];
+					}
+				} 
+
+			}
+																	  
 			$sub_commodity_array = explode(',',$firm_details['sub_commodity']);
 
 			if(!empty($firm_details['sub_commodity'])){

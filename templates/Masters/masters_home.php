@@ -147,6 +147,15 @@
                                                 <a  class="btn btn-block btn-outline-secondary" href="<?php echo $this->getRequest()->getAttribute('webroot');?>masters/fetchAndRedirect/19">Documents List</a>
                                             </div>
                                         </div>
+                                         <!-- For Routine Inspection added by shankhpal shende on 06/12/2022 -->
+                                         <div class="col-md-3"> 
+                                            <div class="form-group">
+                                                <a  class="btn btn-block btn-outline-secondary" href="<?php echo $this->getRequest()->getAttribute('webroot');?>masters/fetchAndRedirect/20">Routine Inspection Period</a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                                     </div>
                                 </div>
                             </div>

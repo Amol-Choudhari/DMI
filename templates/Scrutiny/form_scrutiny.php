@@ -1,6 +1,7 @@
 
 <?php echo $this->Form->control('form_section_id', array('type'=>'hidden', 'id'=>'form_section_id', 'value'=>$section,'label'=>false,)); ?>
-<?php echo $this->Form->control('changefields', array('type'=>'hidden', 'id'=>'changefields', 'value'=>$changefields,'label'=>false,)); ?>
+<!-- //commented below hidden input on 13-04-2023 by Amol, no need of conditions for change flow -->
+<?php //echo $this->Form->control('changefields', array('type'=>'hidden', 'id'=>'changefields', 'value'=>$changefields,'label'=>false,)); ?>
 <?php   echo $this->element($section_details['section_path']); ?>
 
 	<div class="form-style-3 form-middle" id="actiob_buttons_x">

@@ -39,6 +39,7 @@
 			echo $this->Html->script('ca_forms_validations');
 			echo $this->Html->script('bs-custom-file-input.min');
 			echo $this->Html->script('jquery-confirm.min');
+			echo $this->Html->script('Validations/surrender_form_validations');
 
 
 		?>

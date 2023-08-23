@@ -166,6 +166,11 @@ use App\Network\Response\Response;
 				$report_pdf_table = 'DmiCaExportSiteinspectionReports';
 				$this->loadModel($report_pdf_table);				
 			}
+			//added applicationtype==3 condition on 05-04-2023, to get change report table
+			elseif($application_type==3){
+				$report_pdf_table = 'DmiChangeSiteinspectionReports';
+				$this->loadModel($report_pdf_table);				
+			}
 
 			// fetch inspection report pdf record
 			$report_pdf_path = $this->$report_pdf_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id),'order'=>'id DESC'))->first();
@@ -175,7 +180,7 @@ use App\Network\Response\Response;
 
 			}else{
 				//condition added on 08-03-2023 for CA export report and pdf links
-				if($application_type==1 && $checkExport=='yes'){
+				if(($application_type==1 && $checkExport=='yes') || $application_type==3){//added applicationtype==3 condition on 14-04-2023
 					$this->set('download_report_pdf',$report_pdf_path['report_docs']);
 				}else{
 					$this->set('download_report_pdf',$report_pdf_path['pdf_file']);
@@ -206,15 +211,19 @@ use App\Network\Response\Response;
 			$form_type = $this->Customfunctions->checkApplicantFormType($customer_id);
 			$section_details = array();
 			$section_details['grant_pdf'] = '';
-			if (($application_type==1 || $application_type==2) && ($form_type=='C' || $form_type=='D')) {
+			if (($application_type==1 || $application_type==2 || $application_type==3) && ($form_type=='C' || $form_type=='D')) {
 
 				$section_details['grant_pdf']='grantLaboratoryCertificatePdf';
 
 			//Else If Block Statement is  added for export lab for Application Type -> 8 (ADP Flow) grant pdf by shankhpal shende on 17/11/2022
 			}elseif($application_type==8 && $form_type=='ADP'){ 
 				$section_details['grant_pdf']='grantAdpCertificate';
-
+			
+			//Else If Block Statement is  added for Surrender application lab for Application Type -> 9 (SOC) grant pdf - Akash [17-09-2023]
+			}elseif ($application_type == 9 && $split_customer_id[1] == 3) {
+				$section_details['grant_pdf']='grantLaboratoryCertificatePdf';
 			}
+
 			$this->set('section_details',$section_details);
 
 
@@ -486,7 +495,8 @@ use App\Network\Response\Response;
 					//added this condition on 16-09-2019, if appln is CA BEVO
 					//then approved by JTAMA and send to DYAMA
 					//updated condition on 23-01-2023 for PP as per new order of 10-01-2023
-					if(($ca_bevo_applicant == 'yes' || $split_customer_id[1]==2) && $application_type==1) { //added cond. on 22-11-2021 for appl. type = 1
+					//application_type==3 condition on 14-04-2023
+					if(($ca_bevo_applicant == 'yes' || $split_customer_id[1]==2) && ($application_type==1 || $application_type==3)) { //added cond. on 22-11-2021 for appl. type = 1
 
 						#SMS: JTAMA approved application
 						//$this->DmiSmsEmailTemplates->sendMessage(53,$customer_id);
@@ -663,7 +673,12 @@ use App\Network\Response\Response;
 			foreach($fetch_all_granted_pdf as $each_record)
 			{
 				$customer_id = $each_record['customer_id'];
-				
+				//moved below code outside of cond. as used in both if & else
+				//on 16-08-2023 by Amol
+				$this->loadModel('DmiApplWithRoMappings');
+				$find_office_id = $this->DmiApplWithRoMappings->getOfficeDetails($customer_id);
+				$office_type = $find_office_id['office_type'];
+					
 				if($roles['super_admin']=='yes' || $roles['dy_ama']=='yes' || $roles['jt_ama']=='yes' || $roles['ama']=='yes'){					
 					//no conditions
 					$office_email_id = $username;
@@ -672,10 +687,7 @@ use App\Network\Response\Response;
 				}elseif($roles['ro_inspection']=='yes' || $roles['so_inspection']=='yes'){
 					
 					//check application wise RO/SO office
-					$this->loadModel('DmiApplWithRoMappings');
-					$find_office_id = $this->DmiApplWithRoMappings->getOfficeDetails($customer_id);
 					$office_email_id = $find_office_id['ro_email_id'];
-					$office_type = $find_office_id['office_type'];
 					//get RO in-charge id to display all SO applications to RO
 					$ro_incharge = $this->Customfunctions->getApplRegOfficeId($customer_id,$appl_type_id);
 					
@@ -723,10 +735,32 @@ use App\Network\Response\Response;
 					}
 					
 					//get report pdf links
+					
+					//condition added on 01-05-2023 for CA export report and pdf links by Amol
+					$checkExport = $this->Customfunctions->checkApplicantExportUnit($customer_id);
+					if ($appl_type_id==1 && $checkExport=='yes') {			
+						$report_pdf_table = 'DmiCaExportSiteinspectionReports';
+						$this->loadModel($report_pdf_table);				
+				
+					}
+					//added applicationtype==3 condition on 01-05-2023, to get change report table by Amol
+					elseif($appl_type_id==3){
+						$report_pdf_table = 'DmiChangeSiteinspectionReports';
+						$this->loadModel($report_pdf_table);				
+					}
+			
 					$report_pdf = $appl_type_id;//set default to reload page if blank
 					$get_report_pdf = $this->$report_pdf_table->find('all',array('conditions'=>array('customer_id'=>$customer_id),'order'=>'id desc'))->first();
 					if(!empty($get_report_pdf)){
-						$report_pdf = $get_report_pdf[$report_pdf_field];
+						
+						//condition added on 01-05-2023 for CA export report and pdf links
+						//and also for change request report pdf
+						if(($appl_type_id==1 && $checkExport=='yes') || $appl_type_id==3){
+							$report_pdf = $get_report_pdf['report_docs'];
+						}else{
+							$report_pdf = $get_report_pdf[$report_pdf_field];
+						}
+						
 					}
 					
 					
@@ -780,7 +814,7 @@ use App\Network\Response\Response;
 							
 						//added else condition on 29-05-2023 by Amol
 						}elseif(!empty($getStatus)){
-							$appl_array[$i]['status'] = $getStatus['status'];
+							$appl_array[$i]['status'] = $getStatus['status'];//this line is moved inside condition, on 26-05-2023 by Amol
 						}
 					//}	
 						

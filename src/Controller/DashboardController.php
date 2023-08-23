@@ -24,6 +24,7 @@ class DashboardController extends AppController{
 				$this->loadComponent('Randomfunctions');
 
 				$this->viewBuilder()->setHelpers(['Form','Html','Time']);
+			$this->loadModel('DmiRejectedApplLogs'); //Added on 07-08-2023 - Akash
 
 			$this->viewBuilder()->setLayout('admin_dashboard');
 			$this->Session = $this->getRequest()->getSession();
@@ -51,6 +52,11 @@ class DashboardController extends AppController{
 					exit();
 				}
 			}
+			
+			#This below Sesion delete is added to unset the application_type session on click - Akash[05-12-2022]
+			$this->Session->Delete('application_type');
+
+	
 		}
 
 //phase 2 new code from here
@@ -534,6 +540,24 @@ class DashboardController extends AppController{
 
 		}
 
+
+ 		
+		//Description : To obtain list for application for allocation
+		//Author :  -> Shankhpal Shende 
+		//Date : [ 02/12/2022 ]
+		//For Routine Inspection (RTI)
+		
+		public function allocationForRoutineInspectionTab(){
+
+			$this->viewBuilder()->enableAutoLayout(false);//to stop showing blank page for ajax call
+			$sub_tab = 'routine_inspection_allocation_tab';
+			
+			//only for allocation by level 4 Ro listing
+			$this->Session->write('allocation_by',null);
+			$this->commonAllocationsSubTabsCall($sub_tab);
+
+		}
+
 		public function allocationForScrutinyByLevel4RoTab(){
 
 			$this->viewBuilder()->enableAutoLayout(false);//to stop showing blank page for ajax call
@@ -572,6 +596,73 @@ class DashboardController extends AppController{
 			$this->set(compact('appl_type','customer_id','form_type','mo_users_list','comm_with'));
 			$this->render('/element/common_counts_and_list_elements/allocation_popup_models/scrutiny_allocation_popup');
 		}
+
+
+		//Description : For RTI application allocation pop up.
+		//Author :  -> Shankhpal Shende 
+		//Date : 08/12/2022
+		//For Routine Inspection (RTI)
+
+		public function openRoutineInspectionAllocationPopup(){ 
+
+			$this->viewBuilder()->enableAutoLayout(false);//to stop showing blank page for ajax call
+			$appl_type = $_POST['appl_type'];
+		
+			$comm_with = $_POST['comm_with'];
+				
+			$get_customer_id = explode('-',(string) $_POST['customer_id']); #For Deprecations
+		
+			$customer_id = $get_customer_id[0];
+		
+			$form_type = $get_customer_id[1];
+     
+			$status = null;
+
+			$this->loadModel('DmiUserRoles');
+			$this->loadModel('DmiRoOffices');
+			$username = $this->Session->read('username');
+	
+			$find_ro_id = $this->DmiRoOffices->find('list',array('valueField'=>'id','conditions'=>array('ro_email_id IS'=>$username)))->toList();
+
+			$io_users_list = array();
+			if(!empty($find_ro_id))
+			{
+				$ro_id = $find_ro_id;
+
+				$find_user_belongs = $this->DmiUsers->find('list',array('keyField'=>'id', 'valueField'=>'email','conditions'=>array('posted_ro_office IN'=>$ro_id,'status'=>'active')))->toList();
+				
+				$io_users_list = $this->DmiUserRoles->find('list',array('keyField'=>'user_email_id','valueField'=>'user_email_id','conditions'=>array('user_email_id IN'=>$find_user_belongs,'io_inspection'=>'yes')))->toArray();
+			
+
+			}
+
+			//for printing applications show IO all around the offices with role 'inspection_pp'
+			//condition updated on 16-11-2021 for PP appl, only inspected by the user with special role.
+			if($form_type=='B'){
+
+				$io_users_list = $this->DmiUserRoles->find('list',array('keyField'=>'user_email_id','valueField'=>'user_email_id','conditions'=>array('inspection_pp'=>'yes')))->toArray();
+			}
+      
+			//for other types of applications 15 digit, ecode etc
+			//added new query and condition on 16-11-2021
+			$this->loadModel('DmiApplicationTypes');
+			$appl_type_id = $this->DmiApplicationTypes->find('all',array('conditions'=>array('LOWER(application_type) IS'=>strtolower($appl_type))))->first();
+			
+			if($appl_type_id['id']==5 || $appl_type_id['id']==6){
+				//show only RO in-charge user id for site inspection allocation drop down
+				$RoEmailId = $this->Customfunctions->getApplRegOfficeId($customer_id,$appl_type_id['id']);
+				$io_users_list = array($RoEmailId=>$RoEmailId);
+			}
+
+			//function to get first & last name wise list
+			$io_users_list = $this->userNameList($io_users_list);
+
+			$this->set(compact('appl_type','customer_id','form_type','io_users_list','comm_with'));
+			$this->render('/element/common_counts_and_list_elements/allocation_popup_models/routine_inspection_allocation_popup');
+
+		}
+
+
 
 
 		public function openInspectionAllocationPopup(){
@@ -708,7 +799,6 @@ class DashboardController extends AppController{
 								$creat_array='';//clear variable each time
 								$customer_id = $each_alloc['customer_id'];
 
-								$grantDateCondition = $this->Customfunctions->returnGrantDateCondition($customer_id);
 								//get_form_type
 								$form_type = $this->Customfunctions->checkApplicantFormType($customer_id);
 								//get firm details
@@ -717,66 +807,83 @@ class DashboardController extends AppController{
 								$firm_table_id = $firm_details['id'];
 								$appl_type_id = $each_flow['application_type'];
 								$appl_view_link = '../scrutiny/form_scrutiny_fetch_id/'.$firm_table_id.'/view/'.$appl_type_id;
+								$grantDateCondition = $this->Customfunctions->returnGrantDateCondition($customer_id,$appl_type_id);//added new parameter in call "$appl_type_id" on 14-04-2023
+								
+								//below code added on 17-08-2023 by Amol, (note: not for routine insp. appl type 10)
+								//to check if their is any appl after grant, then move for further logic, else return empty array
+								//to avoid listing of any applications in the dashboard after grant.
+								$checkLastApplDate = $this->$final_submit_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id,$grantDateCondition)))->first();
+								if(empty($checkLastApplDate)){
+									//do not add in list
+								}else{								
+									//get Nodal officer details
+									$this->loadModel('DmiUsers');
+									$mo_user_details = $this->DmiUsers->find('all',array('conditions'=>array('email IS'=>$each_alloc['level_1'])))->first();
+									if(empty(!$mo_user_details)){
+										$comm_with = $mo_user_details['f_name'].' '.$mo_user_details['l_name'];
+									}else{
+										$comm_with='Not Allocated';
+									}
 
-								//get Nodal officer details
-								$this->loadModel('DmiUsers');
-								$mo_user_details = $this->DmiUsers->find('all',array('conditions'=>array('email IS'=>$each_alloc['level_1'])))->first();
-								if(empty(!$mo_user_details)){
-									$comm_with = $mo_user_details['f_name'].' '.$mo_user_details['l_name'];
-								}else{
-									$comm_with='Not Allocated';
+									//check final submit status for level 1,2&3 and approved for each allocated id
+									$approved_status = $this->$final_submit_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id,'status'=>'approved','OR'=>array('current_level IN'=>array('level_1','level_2','level_3')),$grantDateCondition)))->first();
+									//get if application is old
+									$is_appl_old = $this->Customfunctions->isOldApplication($customer_id);
+									//get appl current position user
+									$current_pos = $this->Customfunctions->getApplCurrentPos($appl_current_pos_table,$customer_id);
+
+									//get the rejected status - added by akash [07-08-2023]
+									$is_application_rejected = $this->DmiRejectedApplLogs->find('all')->select(['customer_id'])->where(['customer_id IS ' => $customer_id,'appl_type' => $appl_type_id])->order('id DESC')->first();
+								
+									//This below block is added to filter out the rejected application from the scrutiny tab. - Akash [07-08-2023]
+									if (empty($is_application_rejected)) {
+
+									if(empty($approved_status) && !($is_appl_old == 'yes' && $appl_type_id=='1') && !empty($current_pos)){
+
+										//commented below condition to show allocated appls also in allocation window, on 10-08-2022
+										//if($current_pos['current_level']=='level_3' && $current_pos['current_user_email_id']==$username){
+
+											//application must not be with applicant while allocation
+											//added on 03-02-2023 by Amol
+											$finalSubmitStatus = $this->$final_submit_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id),'order'=>'id desc'))->first();
+											if($finalSubmitStatus['status'] != 'referred_back'){
+												$creat_array = true;
+											}
+											
+										//}
+
+									}
+									}
+									
+
+									//creating array to list records with respect to above conditions
+									if($creat_array==true){
+
+										$appl_list_array[$i]['appl_type'] = $appl_type;
+										$appl_list_array[$i]['customer_id'] = $customer_id.'-'.$form_type;
+										$appl_list_array[$i]['firm_name'] = $firm_name;
+										$appl_list_array[$i]['comm_with'] = $comm_with;
+										$appl_list_array[$i]['appl_view_link'] = $appl_view_link;
+										$appl_list_array[$i]['appl_edit_link'] = '';
+										$appl_list_array[$i]['alloc_sub_tab']='scrutiny_allocation_tab';
+
+									}
+
+									$i=$i+1;
 								}
-
-								//check final submit status for level 1,2&3 and approved for each allocated id
-								$approved_status = $this->$final_submit_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id,'status'=>'approved','OR'=>array('current_level IN'=>array('level_1','level_2','level_3')),$grantDateCondition)))->first();
-								//get if application is old
-								$is_appl_old = $this->Customfunctions->isOldApplication($customer_id);
-								//get appl current position user
-								$current_pos = $this->Customfunctions->getApplCurrentPos($appl_current_pos_table,$customer_id);
-
-								if(empty($approved_status) && !($is_appl_old == 'yes' && $appl_type_id=='1') && !empty($current_pos)){
-
-									//commented below condition to show allocated appls also in allocation window, on 10-08-2022
-									//if($current_pos['current_level']=='level_3' && $current_pos['current_user_email_id']==$username){
-
-										//application must not be with applicant while allocation
-										//added on 03-02-2023 by Amol
-										$finalSubmitStatus = $this->$final_submit_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id),'order'=>'id desc'))->first();
-										if($finalSubmitStatus['status'] != 'referred_back'){
-											$creat_array = true;
-										}
-										
-									//}
-
-								}
-
-								//creating array to list records with respect to above conditions
-								if($creat_array==true){
-
-									$appl_list_array[$i]['appl_type'] = $appl_type;
-									$appl_list_array[$i]['customer_id'] = $customer_id.'-'.$form_type;
-									$appl_list_array[$i]['firm_name'] = $firm_name;
-									$appl_list_array[$i]['comm_with'] = $comm_with;
-									$appl_list_array[$i]['appl_view_link'] = $appl_view_link;
-									$appl_list_array[$i]['appl_edit_link'] = '';
-									$appl_list_array[$i]['alloc_sub_tab']='scrutiny_allocation_tab';
-
-								}
-
-							$i=$i+1;
 							}
 						}
 						elseif($sub_tab=='inspection_allocation_tab'){
 
 							//$get_allocations = $this->$allocation_table->find('all',array('conditions' => array('level_3'=>$username)))->toArray();
 
-							$stmt = $conn->execute("select al.* from $allocationTable as al
-								inner join (
-										select max(id) id, customer_id
-										from $allocationTable
-										group by customer_id
-								) as maxall on maxall.customer_id = al.customer_id and maxall.id = al.id
-								where al.level_3='$username'");
+							$stmt = $conn->execute("SELECT al.* FROM $allocationTable AS al
+								INNER JOIN (
+									SELECT max(id) id, customer_id
+									FROM $allocationTable
+									GROUP BY customer_id
+								) AS maxall ON maxall.customer_id = al.customer_id AND maxall.id = al.id
+								WHERE al.level_3='$username'");
 							$get_allocations = $stmt ->fetchAll('assoc');
 
 							foreach($get_allocations as $each_alloc){
@@ -800,13 +907,17 @@ class DashboardController extends AppController{
 									if($NablDate != null){
 										$inspection = 'no';
 									}
+								
+								//This condition block is applied for the flow of Surrender [SOC] having application_type = 9.
+								//to skip the skip the allocation for inspection part - Akash [05-12-2022]
+								}elseif($each_flow['application_type']=='9'){
+									$inspection = 'no';
 								}
 
 								
 
 								if($inspection == 'yes'){
 
-									$grantDateCondition = $this->Customfunctions->returnGrantDateCondition($customer_id);
 									//get_form_type
 									$form_type = $this->Customfunctions->checkApplicantFormType($customer_id);
 									//get firm details
@@ -815,61 +926,79 @@ class DashboardController extends AppController{
 									$firm_table_id = $firm_details['id'];
 									$appl_type_id = $each_flow['application_type'];
 									$appl_view_link = '../scrutiny/form_scrutiny_fetch_id/'.$firm_table_id.'/view/'.$appl_type_id;
-
-									//get Nodal officer details
-									$this->loadModel('DmiUsers');
-									$mo_user_details = $this->DmiUsers->find('all',array('conditions'=>array('email IS'=>$each_alloc['level_2'])))->first();
-									if(empty(!$mo_user_details)){
-										$comm_with = $mo_user_details['f_name'].' '.$mo_user_details['l_name'];
+									$grantDateCondition = $this->Customfunctions->returnGrantDateCondition($customer_id,$appl_type_id);//added new parameter in call "$appl_type_id" on 14-04-2023
+									
+									//below code added on 17-08-2023 by Amol, (note: not for routine insp. appl type 10)
+									//to check if their is any appl after grant, then move for further logic, else return empty array
+									//to avoid listing of any applications in the dashboard after grant.
+									$checkLastApplDate = $this->$final_submit_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id,$grantDateCondition)))->first();
+									if(empty($checkLastApplDate)){
+										//do not add in list
 									}else{
-										$comm_with='Not Allocated';
-									}
 
-									//check final submit status for level 2 & 3 and approved for each allocated id
-									$approved_status = $this->$final_submit_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id,$grantDateCondition,'status'=>'approved','OR'=>array('current_level IN'=>array('level_2','level_3')))))->first();
-									//check scrutiny status
-									$scrutiny_status = $this->$final_submit_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id,$grantDateCondition,'status'=>'approved','current_level'=>'level_1')))->first();
-									//get if application is old
-									$is_appl_old = $this->Customfunctions->isOldApplication($customer_id);
-									//get appl current position user
-									$current_pos = $this->Customfunctions->getApplCurrentPos($appl_current_pos_table,$customer_id);
+										//get Nodal officer details
+										$this->loadModel('DmiUsers');
+										$mo_user_details = $this->DmiUsers->find('all',array('conditions'=>array('email IS'=>$each_alloc['level_2'])))->first();
+										if(empty(!$mo_user_details)){
+											$comm_with = $mo_user_details['f_name'].' '.$mo_user_details['l_name'];
+										}else{
+											$comm_with='Not Allocated';
+										}
 
-									if(!empty($scrutiny_status)){
+										//check final submit status for level 2 & 3 and approved for each allocated id
+										$approved_status = $this->$final_submit_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id,$grantDateCondition,'status'=>'approved','OR'=>array('current_level IN'=>array('level_2','level_3')))))->first();
+										//check scrutiny status
+										$scrutiny_status = $this->$final_submit_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id,$grantDateCondition,'status'=>'approved','current_level'=>'level_1')))->first();
+										//get if application is old
+										$is_appl_old = $this->Customfunctions->isOldApplication($customer_id);
+										//get appl current position user
+										$current_pos = $this->Customfunctions->getApplCurrentPos($appl_current_pos_table,$customer_id);
+										
+										//get the rejected status - added by akash [07-08-2023]
+										$is_application_rejected = $this->DmiRejectedApplLogs->find('all')->select(['customer_id'])->where(['customer_id IS ' => $customer_id,'appl_type' => $appl_type_id])->order('id DESC')->first();
+									
+										//This below block is added to filter out the rejected application from the scrutiny tab. - Akash [07-08-2023]
+										if (empty($is_application_rejected)) {
 
-										if(empty($approved_status) && !($is_appl_old == 'yes' && $appl_type_id=='1' && !empty($current_pos))){
+										if(!empty($scrutiny_status)){
 
-											if(!($form_type == 'C' && ($appl_type_id=='1' || $appl_type_id=='2'))){//don't list lab export appl. with flow new & renewal
-												
-												//commented below condition to show allocated appls also in allocation window, on 10-08-2022
-												//if($current_pos['current_level']=='level_3' && $current_pos['current_user_email_id']==$username){
+											if(empty($approved_status) && !($is_appl_old == 'yes' && $appl_type_id=='1' && !empty($current_pos))){
 
-												//application must not be with applicant while allocation
-													//added on 03-02-2023 by Amol
-													$finalSubmitStatus = $this->$final_submit_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id),'order'=>'id desc'))->first();
-													if($finalSubmitStatus['status'] != 'referred_back'){
-														$creat_array = true;
-													}
+												if(!($form_type == 'C' && ($appl_type_id=='1' || $appl_type_id=='2'))){//don't list lab export appl. with flow new & renewal
+													
+													//commented below condition to show allocated appls also in allocation window, on 10-08-2022
+													//if($current_pos['current_level']=='level_3' && $current_pos['current_user_email_id']==$username){
 
-												//}
+													//application must not be with applicant while allocation
+														//added on 03-02-2023 by Amol
+														$finalSubmitStatus = $this->$final_submit_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id),'order'=>'id desc'))->first();
+														if($finalSubmitStatus['status'] != 'referred_back'){
+															$creat_array = true;
+														}
 
+													//}
+
+												}
 											}
 										}
+										}
+									
+
+										//creating array to list records with respect to above conditions
+										if($creat_array==true){
+
+											$appl_list_array[$i]['appl_type'] = $appl_type;
+											$appl_list_array[$i]['customer_id'] = $customer_id.'-'.$form_type;
+											$appl_list_array[$i]['firm_name'] = $firm_name;
+											$appl_list_array[$i]['comm_with'] = $comm_with;
+											$appl_list_array[$i]['appl_view_link'] = $appl_view_link;
+											$appl_list_array[$i]['appl_edit_link'] = '';
+											$appl_list_array[$i]['alloc_sub_tab']='inspection_allocation_tab';
+
+										}
+
+										$i=$i+1;
 									}
-
-									//creating array to list records with respect to above conditions
-									if($creat_array==true){
-
-										$appl_list_array[$i]['appl_type'] = $appl_type;
-										$appl_list_array[$i]['customer_id'] = $customer_id.'-'.$form_type;
-										$appl_list_array[$i]['firm_name'] = $firm_name;
-										$appl_list_array[$i]['comm_with'] = $comm_with;
-										$appl_list_array[$i]['appl_view_link'] = $appl_view_link;
-										$appl_list_array[$i]['appl_edit_link'] = '';
-										$appl_list_array[$i]['alloc_sub_tab']='inspection_allocation_tab';
-
-									}
-
-									$i=$i+1;
 								}
 							}
 						}
@@ -882,8 +1011,7 @@ class DashboardController extends AppController{
 								$creat_array='';//clear variable each time
 								$customer_id = $each_alloc['customer_id'];
 
-								$grantDateCondition = $this->Customfunctions->returnGrantDateCondition($customer_id);
-
+								
 								//get_form_type
 								$form_type = $this->Customfunctions->checkApplicantFormType($customer_id);
 								//get appl current position user
@@ -894,64 +1022,210 @@ class DashboardController extends AppController{
 								$firm_table_id = $firm_details['id'];
 								$appl_type_id = $each_flow['application_type'];
 								$appl_view_link = '../scrutiny/form_scrutiny_fetch_id/'.$firm_table_id.'/view/'.$appl_type_id;
-
-								//get Nodal officer details
-								$this->loadModel('DmiUsers');
-								$mo_user_details = $this->DmiUsers->find('all',array('conditions'=>array('email IS'=>$each_alloc['level_4_mo'])))->first();
-								if(empty(!$mo_user_details)){
-									$comm_with = $mo_user_details['f_name'].' '.$mo_user_details['l_name'];
-								}else{
-									$comm_with='Not Allocated';
-								}
-
-								//check reports final submitted
-								$reports_submitted_status = $this->$final_submit_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id,$grantDateCondition,'status'=>'approved','current_level'=>'level_2')))->first();
-								//check final submit status for level 3 & 4 and approved for each allocated id
-								$approved_status = $this->$final_submit_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id,$grantDateCondition,'status'=>'approved','OR'=>array('current_level IN'=>array('level_3','level_4')))))->first();
+								$grantDateCondition = $this->Customfunctions->returnGrantDateCondition($customer_id,$appl_type_id);//added new parameter in call "$appl_type_id" on 14-04-2023
 								
-								//Query to check the last ro-so comments to_user field - Akash [04-05-2023]
-								$last_ro_so_comment = $this->$ro_so_comments_table->find()->select('to_user')->where(['customer_id IS' => $customer_id])->order(['id desc'])->first();
+								//below code added on 17-08-2023 by Amol, (note: not for routine insp. appl type 10)
+								//to check if their is any appl after grant, then move for further logic, else return empty array
+								//to avoid listing of any applications in the dashboard after grant.
+								$checkLastApplDate = $this->$final_submit_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id,$grantDateCondition)))->first();
+								if(empty($checkLastApplDate)){
+									//do not add in list
+								}else{
 
+									//get Nodal officer details
+									$this->loadModel('DmiUsers');
+									$mo_user_details = $this->DmiUsers->find('all',array('conditions'=>array('email IS'=>$each_alloc['level_4_mo'])))->first();
+									if(empty(!$mo_user_details)){
+										$comm_with = $mo_user_details['f_name'].' '.$mo_user_details['l_name'];
+									}else{
+										$comm_with='Not Allocated';
+									}
 
-								if(!empty($reports_submitted_status) && empty($approved_status)){
+									//check reports final submitted
+									$reports_submitted_status = $this->$final_submit_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id,$grantDateCondition,'status'=>'approved','current_level'=>'level_2')))->first();
+									//check final submit status for level 3 & 4 and approved for each allocated id
+									$approved_status = $this->$final_submit_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id,$grantDateCondition,'status'=>'approved','OR'=>array('current_level IN'=>array('level_3','level_4')))))->first();
+									
+									//Query to check the last ro-so comments to_user field - Akash [04-05-2023]
+									$last_ro_so_comment = $this->$ro_so_comments_table->find()->select('to_user')->where(['customer_id IS' => $customer_id])->order(['id desc'])->first();
 
-									//commented below condition to show allocated appls also in allocation window, on 10-08-2022
-									//if($current_pos['current_level']=='level_4_ro' && $current_pos['current_user_email_id']==$username){
+									//This block is added to check the empty field to elimanate the array offset error - Akash [07-08-2023]
+									if (!empty($last_ro_so_comment)) {
+										$checkLastUserIsSo = $last_ro_so_comment['to_user'];
+									}else{
+										$checkLastUserIsSo = null;
+									}
 
-									//application must not be with applicant while allocation
-										//added on 03-02-2023 by Amol
-										$finalSubmitStatus = $this->$final_submit_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id),'order'=>'id desc'))->first();
+									//get the rejected status - added by akash [07-08-2023]
+									$is_application_rejected = $this->DmiRejectedApplLogs->find('all')->select(['customer_id'])->where(['customer_id IS ' => $customer_id,'appl_type' => $appl_type_id])->order('id DESC')->first();
+									
+									//This below block is added to filter out the rejected application from the scrutiny tab. - Akash [07-08-2023]
+									if (empty($is_application_rejected)) {
 
-										//added level_4 from current postion variable and to_user condtion to hide the application from scrutiny tab if it is forwarded to HO. - Akash [04-05-2023]
-										if($finalSubmitStatus['status'] != 'referred_back' && $current_pos['current_level'] !='level_4' && $last_ro_so_comment['to_user'] != 'so'){ 
-											$creat_array = true;
+										if(!empty($reports_submitted_status) && empty($approved_status)){
+
+											//commented below condition to show allocated appls also in allocation window, on 10-08-2022
+											//if($current_pos['current_level']=='level_4_ro' && $current_pos['current_user_email_id']==$username){
+
+											//application must not be with applicant while allocation
+												//added on 03-02-2023 by Amol
+												$finalSubmitStatus = $this->$final_submit_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id),'order'=>'id desc'))->first();
+
+												//added level_4 from current postion variable and to_user condtion to hide the application from scrutiny tab if it is forwarded to HO. - Akash [04-05-2023]
+													if($finalSubmitStatus['status'] != 'referred_back' && $current_pos['current_level'] !='level_4' && $checkLastUserIsSo != 'so'){ 
+													$creat_array = true;
+												}
+
+											//}
 										}
+									}
 
-									//}
+									//creating array to list records with respect to above conditions
+									if($creat_array==true){
+
+										$appl_list_array[$i]['appl_type'] = $appl_type;
+										$appl_list_array[$i]['customer_id'] = $customer_id.'-'.$form_type;
+										$appl_list_array[$i]['firm_name'] = $firm_name;
+										$appl_list_array[$i]['comm_with'] = $comm_with;
+										$appl_list_array[$i]['appl_view_link'] = $appl_view_link;
+										$appl_list_array[$i]['appl_edit_link'] = '';
+										$appl_list_array[$i]['alloc_sub_tab']='scrutiny_allocation_tab';
+
+									}
+
+									$i=$i+1;
 								}
-
-								//creating array to list records with respect to above conditions
-								if($creat_array==true){
-
-									$appl_list_array[$i]['appl_type'] = $appl_type;
-									$appl_list_array[$i]['customer_id'] = $customer_id.'-'.$form_type;
-									$appl_list_array[$i]['firm_name'] = $firm_name;
-									$appl_list_array[$i]['comm_with'] = $comm_with;
-									$appl_list_array[$i]['appl_view_link'] = $appl_view_link;
-									$appl_list_array[$i]['appl_edit_link'] = '';
-									$appl_list_array[$i]['alloc_sub_tab']='scrutiny_allocation_tab';
-
-								}
-
-							$i=$i+1;
 							}
 
+						}elseif($sub_tab=='routine_inspection_allocation_tab'){ //Routine Inspection For CA, PP, Lab added by shankhpal shende on 06/12/2022
+
+							if($each_flow['application_type']=='10'){
+								//load models
+								$this->loadModel('DmiGrantCertificatesPdfs');
+								$this->loadModel('DmiRtiFinalReports');
+								$this->loadModel('DmiRoutineInspectionLabReports');
+								$this->loadModel('DmiRoOffices');
+								$this->loadModel('DmiRoutineInspectionPeriod');
+								$this->loadModel('DmiSiteinspectionFinalReports');
+								$this->loadModel('DmiUsers'); //get Nodal officer details
+								$this->loadModel('DmiRtiAllocations');
+
+								$username = $this->Session->read('username');
+								$get_short_codes = $this->DmiRoOffices->find('list',array('valueField'=>'short_code','conditions'=>array('ro_email_id IS'=>$username)))->toArray(); //get RO/SO Incharge details
+								$condition = '';
+								$n = 1;
+								foreach($get_short_codes as $key => $value){
+									
+									if($key != (count($get_short_codes) - 1)){
+										$seprator = ($n!=1)?' OR ':'';
+										$condition .= $seprator."customer_id like '%/$value/%'";  // dynamic condition to get short code of login users
+										$n++;	
+									}
+
+								}
+								$grant_record_list =  $this->DmiGrantCertificatesPdfs->find('all',array('conditions'=>array($condition)), array('order'=>'id desc'))->distinct('customer_id')->toArray(); // fetched record conditionaly 
+				  
+								if(!empty($grant_record_list)){
+
+									foreach($grant_record_list as $each_alloc){
+											
+										$creat_array='';//clear variable each time
+										$customer_id = $each_alloc['customer_id'];
+										$split_secondary_id				= 	explode('/',(string) $customer_id);
+										$splited_secondary_id_value		= 	$split_secondary_id[1];  // splited type of id like 1,2,3
+										$routin_inspection_period = $this->DmiRoutineInspectionPeriod->find('all',array('conditions'=>array('firm_type IS'=>$splited_secondary_id_value)))->first();
+										$period = $routin_inspection_period['period'];
+										$inspection = 'no'; //by default
+										$grantDateCondition = $this->Customfunctions->returnGrantDateCondition($customer_id);
+										//get result all approved applications for routine inspection
+										$all_approved_record = $this->DmiRtiFinalReports->find('all',array('conditions'=>array('customer_id IS'=>$customer_id,'status'=>'approved'),array('order'=>'id desc')))->first();
+										$created = ''; // by default blank 
+										
+										if(!empty($all_approved_record)){
+											$created = $all_approved_record['created']; // hold created date
+										}else{
+											// if $all_approved_record array are empty
+											// then other application available for routine inspection from DmiSiteinspectionFinalReports table
+											$site_inspection = $this->DmiSiteinspectionFinalReports->find('all',array('conditions'=>array('customer_id IS'=>$customer_id,'status'=>'pending'),array('order'=>'id desc')))->first();
+										
+											if(!empty($site_inspection)){
+												$created = $site_inspection['created'];		// hold created date											
+											}
+											 
+										}
+										 // when created date not empty  pass any one
+										if(!empty($created)){
+											
+											$split_created	= 	explode(' ',(string) $created); 
+											$date1 = $split_created[0]; //hold only date 
+											$monthRTIApproved = $this->Customfunctions->monthcalForRti($date1); // pass all the approved date to monthcalForRti function in customfunction components to return calculated month to till date
+											//Note : $period are set from dmi_routine_inspection_period table
+											//compaire if monthRTIApproved are greter than period
+											if($monthRTIApproved > $period){
+												$inspection = 'yes';
+											}
+										
+										}else{ // if condition not satisfiy then the approved application is not available for the inspection pass 'no'
+											 $inspection = 'no';
+										 }
+										
+										// if inspection yes then approved application are available to routine inspection 
+										if($inspection == 'yes'){
+
+											$grantDateCondition = $this->Customfunctions->returnGrantDateCondition($customer_id);
+											$form_type = $this->Customfunctions->checkApplicantFormType($customer_id); //get_form_type
+											$firm_details = $this->DmiFirms->firmDetails($customer_id); //get firm details
+											$firm_name = $firm_details['firm_name'];
+											$firm_table_id = $firm_details['id'];
+											$appl_type_id = $each_flow['application_type'];
+											//$appl_view_link = '../scrutiny/form_scrutiny_fetch_id/'.$firm_table_id.'/view/'.$appl_type_id;
+											$appl_view_link = '../scrutiny/form_scrutiny_fetch_id/'.$firm_table_id.'/view/1';//default set to 1 to open application sections added by shankhapal shende on 30/06/2023
+
+											$approved_record = $this->DmiRtiFinalReports->find('all', array('conditions'=>array('customer_id IS'=>$customer_id,'status'=>'approved'),'order'=>'id desc'))->first();
+										
+											if(!empty($approved_record)){
+												
+												$get_allocations = $this->DmiRtiAllocations->find('all', array('conditions'=>array('customer_id IS'=>$customer_id,'date(created) > '=>$approved_record['created']),'order'=>'id desc'))->first();
+											
+												if(!empty($get_allocations)){
+													$mo_user_details = $this->DmiUsers->find('all',array('conditions'=>array('email IS'=>$get_allocations['level_2'])))->first();
+													$comm_with = $mo_user_details['f_name'].' '.$mo_user_details['l_name'];
+												}else{
+													$comm_with='Not Allocated';
+												}
+
+											}
+											if(!empty($site_inspection)){
+												
+												$get_allocations = $this->DmiRtiAllocations->find('all',array('conditions' => array('customer_id IS'=>$customer_id),'order'=>'id desc'))->first();
+
+												if(!empty($get_allocations)){
+													$mo_user_details = $this->DmiUsers->find('all',array('conditions'=>array('email IS'=>$get_allocations['level_2'])))->first();
+													$comm_with = $mo_user_details['f_name'].' '.$mo_user_details['l_name'];
+												}else{
+													$comm_with='Not Allocated';
+												}
+												
+											}
+											$creat_array = true;
+										}
+										//creating array to list records with respect to above conditions
+										if($creat_array==true){
+											$appl_list_array[$i]['appl_type'] = 'Routine Inspection';
+											$appl_list_array[$i]['customer_id'] = $customer_id.'-'.$form_type;
+											$appl_list_array[$i]['firm_name'] = $firm_name;
+											$appl_list_array[$i]['comm_with'] = $comm_with;
+											$appl_list_array[$i]['appl_view_link'] = $appl_view_link;
+											$appl_list_array[$i]['appl_edit_link'] = '';
+											$appl_list_array[$i]['alloc_sub_tab']='routine_inspection_allocation_tab';
+										}
+										$i=$i+1;
+									}
+								}
+							}
 						}
-
 					}
-
-					//for HO level scrutiny allocations
-					elseif($for_level=='level_4'){
+					elseif($for_level=='level_4'){ //for HO level scrutiny allocations
 
 						if($sub_tab=='scrutiny_allocation_tab'){
 
@@ -963,7 +1237,7 @@ class DashboardController extends AppController{
 
 								$customer_id = $each_alloc['customer_id'];
 
-								$grantDateCondition = $this->Customfunctions->returnGrantDateCondition($customer_id);
+								
 								//get_form_type
 								$form_type = $this->Customfunctions->checkApplicantFormType($customer_id);
 
@@ -974,52 +1248,70 @@ class DashboardController extends AppController{
 
 								$appl_type_id = $each_flow['application_type'];
 								$appl_view_link = '../scrutiny/form_scrutiny_fetch_id/'.$firm_table_id.'/view/'.$appl_type_id;
-
-								//get Nodal officer details
-								$this->loadModel('DmiUsers');
-								$mo_user_details = $this->DmiUsers->find('all',array('conditions'=>array('email IS'=>$each_alloc['ho_mo_smo'])))->first();
-								if(empty(!$mo_user_details)){
-									$comm_with = $mo_user_details['f_name'].' '.$mo_user_details['l_name'];
+								
+								$grantDateCondition = $this->Customfunctions->returnGrantDateCondition($customer_id,$appl_type_id);
+								
+								//below code added on 17-08-2023 by Amol, (note: not for routine insp. appl type 10)
+								//to check if their is any appl after grant, then move for further logic, else return empty array
+								//to avoid listing of any applications in the dashboard after grant.
+								$checkLastApplDate = $this->$final_submit_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id,$grantDateCondition)))->first();
+								if(empty($checkLastApplDate)){
+									//do not add in list
 								}else{
-									$comm_with='Not Allocated';
+
+									//get Nodal officer details
+									$this->loadModel('DmiUsers');
+									$mo_user_details = $this->DmiUsers->find('all',array('conditions'=>array('email IS'=>$each_alloc['ho_mo_smo'])))->first();
+									if(empty(!$mo_user_details)){
+										$comm_with = $mo_user_details['f_name'].' '.$mo_user_details['l_name'];
+									}else{
+										$comm_with='Not Allocated';
+									}
+
+									//check final submit status for level 1 and approved for each allocated id
+									$level1_approved_status = $this->$final_submit_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id,$grantDateCondition,'status'=>'approved','OR'=>array('current_level IN'=>array('level_3','level_4')))))->first();
+
+									//get appl current position user
+									$current_pos = $this->Customfunctions->getApplCurrentPos($appl_current_pos_table,$customer_id);
+
+									//get the rejected status - added by akash [07-08-2023]
+									$is_application_rejected = $this->DmiRejectedApplLogs->find('all')->select(['customer_id'])->where(['customer_id IS ' => $customer_id,'appl_type' => $appl_type_id])->order('id DESC')->first();
+																	
+									//This below block is added to filter out the rejected application from the scrutiny tab. - Akash [07-08-2023]
+									if (empty($is_application_rejected)) {
+
+									if(empty($level1_approved_status) && !empty($current_pos)){
+
+										//commented below condition to show allocated appls also in allocation window, on 10-08-2022
+										//if($current_pos['current_user_email_id']==$username && $current_pos['current_level']=='level_4'){
+
+										//application must not be with applicant while allocation
+											//added on 03-02-2023 by Amol
+											$finalSubmitStatus = $this->$final_submit_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id),'order'=>'id desc'))->first();
+											if($finalSubmitStatus['status'] != 'referred_back'){
+												$creat_array = true;
+											}
+
+										//}
+
+									}
+									}
+
+									//creating array to list records with respect to above conditions
+									if($creat_array==true){
+
+										$appl_list_array[$i]['appl_type'] = $appl_type;
+										$appl_list_array[$i]['customer_id'] = $customer_id.'-'.$form_type;
+										$appl_list_array[$i]['firm_name'] = $firm_name;
+										$appl_list_array[$i]['comm_with'] = $comm_with;
+										$appl_list_array[$i]['appl_view_link'] = $appl_view_link;
+										$appl_list_array[$i]['appl_edit_link'] = '';
+										$appl_list_array[$i]['alloc_sub_tab']='scrutiny_allocation_tab';
+
+									}
+
+									$i=$i+1;
 								}
-
-								//check final submit status for level 1 and approved for each allocated id
-								$level1_approved_status = $this->$final_submit_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id,$grantDateCondition,'status'=>'approved','OR'=>array('current_level IN'=>array('level_3','level_4')))))->first();
-
-								//get appl current position user
-								$current_pos = $this->Customfunctions->getApplCurrentPos($appl_current_pos_table,$customer_id);
-
-								if(empty($level1_approved_status) && !empty($current_pos)){
-
-									//commented below condition to show allocated appls also in allocation window, on 10-08-2022
-									//if($current_pos['current_user_email_id']==$username && $current_pos['current_level']=='level_4'){
-
-									//application must not be with applicant while allocation
-										//added on 03-02-2023 by Amol
-										$finalSubmitStatus = $this->$final_submit_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id),'order'=>'id desc'))->first();
-										if($finalSubmitStatus['status'] != 'referred_back'){
-											$creat_array = true;
-										}
-
-									//}
-
-								}
-
-								//creating array to list records with respect to above conditions
-								if($creat_array==true){
-
-									$appl_list_array[$i]['appl_type'] = $appl_type;
-									$appl_list_array[$i]['customer_id'] = $customer_id.'-'.$form_type;
-									$appl_list_array[$i]['firm_name'] = $firm_name;
-									$appl_list_array[$i]['comm_with'] = $comm_with;
-									$appl_list_array[$i]['appl_view_link'] = $appl_view_link;
-									$appl_list_array[$i]['appl_edit_link'] = '';
-									$appl_list_array[$i]['alloc_sub_tab']='scrutiny_allocation_tab';
-
-								}
-
-								$i=$i+1;
 							}
 						}
 
@@ -1356,6 +1648,163 @@ class DashboardController extends AppController{
 
 		}
 
+	
+	//Description : For Allocation Tab 
+	//Author :  -> Shankhpal Shende 
+	//Date : 09/12/2022
+	//For Routine Inspection (RTI)
+
+	//Description : For Allocation Tab updated function for logical change
+	//Author :  -> Shankhpal Shende 
+	//Date :18/05/2023
+	//For Routine Inspection (RTI)
+	
+	public function allocateApplForRoutineInspection(){
+     
+		$this->autoRender= false;
+		$get_customer_id = explode('-',htmlentities($_POST['customer_id'], ENT_QUOTES));
+	
+		$customer_id = $get_customer_id[0];
+	
+		$appl_type = htmlentities($_POST['appl_type'], ENT_QUOTES);
+
+		$io_user_id = htmlentities($_POST['io_user_id'], ENT_QUOTES);
+			
+		$current_date = date('d-m-Y H:i:s');
+		$ro_scheduled_date = htmlentities($_POST['ro_scheduled_date'], ENT_QUOTES);
+
+		//get allocation table name from flow wise tables
+		$this->loadModel('DmiFlowWiseTablesLists');
+		$this->loadModel('DmiApplicationTypes');
+		$this->loadModel('DmiUsers');
+		$this->loadModel('DmiRoOffices');
+		$this->loadModel('DmiIoAllocationLogs');
+		$this->loadComponent('Customfunctions');
+		$this->loadModel('DmiRtiAllocationsLog'); // log model dedded by shankhpal on 17/05/2023
+
+		$ro_scheduled_date = $this->Customfunctions->dateFormatCheck($ro_scheduled_date);
+
+		$current_level = $this->Session->read('current_level');
+		$username = $this->Session->read('username');
+
+		//get allocating officer user details
+		$get_user_id = $this->DmiUsers->find('all',array('fields'=>'id','conditions'=>array('email IS'=>$username)))->first();
+		
+		$user_id = $get_user_id['id'];
+
+		$appl_type_id = $this->DmiApplicationTypes->find('all',array('conditions'=>array('LOWER(application_type) IS'=>strtolower($appl_type))))->first();
+
+		//this temporary session varible is set for the SMS and Email - Akash [10-10-2022]
+		$_SESSION['application_type_temp'] = $appl_type_id['id'];
+
+		$flow_wise_tables = $this->DmiFlowWiseTablesLists->find('all',array('conditions'=>array('application_type IS'=>$appl_type_id['id'])))->first();
+	
+		$allocation_table = $flow_wise_tables['allocation'];
+		
+		$current_position_table = $flow_wise_tables['appl_current_pos'];
+
+		$this->loadModel($allocation_table);
+		$this->loadModel($current_position_table);
+
+		//get IO user details
+		$user_details = $this->DmiUsers->find('all',array('conditions'=>array('email IS'=>$io_user_id)))->first();
+		$io_posted_id = $user_details['posted_ro_office'];
+
+		//get IO posted office
+		$io_office = $this->DmiRoOffices->find('all',array('conditions'=>array('id IS'=>$io_posted_id)))->first();
+		$io_office = $io_office['ro_office'];
+	
+
+
+		if($current_level=='level_3'){//by RO/SO as nodal office
+	
+			$allocation_type = '0';// 0 & 1 for first Inspection allocation/reallocation
+			$msg_id = 14;
+	
+			//get latest record for allocation
+			$get_latest_id = $this->$allocation_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id),'order'=>'id DESC'))->first();
+
+			if(!empty($get_latest_id)){
+		
+				if($get_latest_id['level_2'] != null){$allocation_type = '1'; $msg_id = 15;}//to check allocation or reallocation
+
+				$next_level = 'level_2';
+				$mo_column_name = 'level_2';
+			
+			}
+		}
+			
+				  $next_level = 'level_2';
+				  $mo_column_name = 'level_2';
+				//Insert entry in current position table
+				  $this->$current_position_table->currentUserEntry($customer_id,$io_user_id,$next_level);
+
+         
+					$allocation_entry = $this->$allocation_table->newEntity(array(
+						$mo_column_name=>$io_user_id,
+						'customer_id'=>$customer_id,
+						'level_3' => $username, 
+					  'current_level'=>$io_user_id,
+						'created'=>date('Y-m-d H:i:s'),
+						'modified'=>date('Y-m-d H:i:s'),
+						'ro_scheduled_date'=>$ro_scheduled_date,
+						'io_scheduled_date'=>$ro_scheduled_date));
+          
+					if($this->$allocation_table->save($allocation_entry)){
+
+						// Save the log of allocated application (Done by shankhpal shende on 17/05/2023)
+						$DmiRtiAllocationsLogEntity = $this->DmiRtiAllocationsLog->newEntity(array(
+							
+							$mo_column_name=>$io_user_id,
+							'customer_id'=>$customer_id,
+							'level_3' => $username, 
+							'current_level'=>$io_user_id,
+							'created'=>date('Y-m-d H:i:s'),
+							'modified'=>date('Y-m-d H:i:s'),
+							'ro_scheduled_date'=>$ro_scheduled_date,
+							'io_scheduled_date'=>$ro_scheduled_date
+
+						));
+						$this->DmiRtiAllocationsLog->save($DmiRtiAllocationsLogEntity);
+					
+					#SMS: Rutin Inspection   // commented by shankhpal shende on 09/12/2022
+					//$this->DmiSmsEmailTemplates->sendMessage($msg_id,$customer_id);
+					// }
+
+
+
+					}
+			
+				//update current position table
+				$this->$current_position_table->currentUserUpdate($customer_id,$io_user_id,$next_level);
+
+				// Common IO allocation logs, dirrentiate with allocation type nos
+				$allocation_logs_entity = $this->DmiIoAllocationLogs->newEntity(array(
+
+					'customer_id'=>$customer_id,
+					'application_type'=>$appl_type_id['id'],
+					'created'=>$current_date,
+					'user_id'=>$user_id,
+					'io_office'=>$io_office,
+					'io_email_id'=>$io_user_id,
+					'allocation_type'=>$allocation_type
+
+				));
+
+				if($this->DmiIoAllocationLogs->save($allocation_logs_entity)){
+					
+					#SMS: Rutin Inspection   // commented by shankhpal shende on 09/12/2022
+					//$this->DmiSmsEmailTemplates->sendMessage($msg_id,$customer_id); 
+				}
+
+			
+
+			exit;
+
+	}
+
+
+
 		// Function to combine user name and user email id and create user name(ID) value
 		public function userNameList($user_email_list){
 
@@ -1378,7 +1827,7 @@ class DashboardController extends AppController{
 			return $user_name_details;
 		}
 
-//allocations ends
+		///allocations ends
 
 
 	//this is an ajax function call to change inspection date by IO/RO
@@ -1654,8 +2103,8 @@ class DashboardController extends AppController{
 				  }elseif($for_level=='level_3' || $for_level=='level_4'){
 					  $for_status = array('pending','ref_back','replied');
 				  }
-*/
-				  $nodal_allocation_sub_tab = array('scrutiny_allocation_tab','scrutiny_allocation_by_level4ro_tab','inspection_allocation_tab');
+					*/
+				  $nodal_allocation_sub_tab = array('scrutiny_allocation_tab','scrutiny_allocation_by_level4ro_tab','inspection_allocation_tab','routine_inspection_allocation_tab');
 				  $ho_allocation_sub_tab = array('scrutiny_allocation_tab');
 				  
 				  $for_status = array($fetchStatus);
@@ -2320,7 +2769,7 @@ class DashboardController extends AppController{
 		//$stmt = $conn->execute("select id,ro_office from dmi_ro_offices where office_type='$office_type' AND delete_status IS NULL");
 		
 		//added below query without office type condition on 12-06-2023 by Amol,to solve SO to Ro transfer of PP appl for single officer
-		$stmt = $conn->execute("select id,ro_office from dmi_ro_offices where delete_status IS NULL");
+		$stmt = $conn->execute("select id,ro_office from dmi_ro_offices where office_type IN ('RO','SO') AND delete_status IS NULL order by ro_office");
 		
 		$appl_list = $stmt ->fetchAll('assoc');
 
@@ -2608,6 +3057,162 @@ class DashboardController extends AppController{
 
 //phase 2 new code till above
 
+
+	//Description : when click on re_allocation button call function
+	//Author :  -> Shankhpal Shende 
+	//Date :18/05/2023
+	//For Routine Inspection (RTI)
+	
+	public function reAllocateApplForRoutineInspection(){
+     
+		$this->autoRender= false;
+		$get_customer_id = explode('-',htmlentities($_POST['customer_id'], ENT_QUOTES));
+	
+		$customer_id = $get_customer_id[0];
+	
+		$appl_type = htmlentities($_POST['appl_type'], ENT_QUOTES);
+
+		$io_user_id = htmlentities($_POST['io_user_id'], ENT_QUOTES);
+			
+		$current_date = date('d-m-Y H:i:s');
+		$ro_scheduled_date = htmlentities($_POST['ro_scheduled_date'], ENT_QUOTES);
+
+		//get allocation table name from flow wise tables
+		$this->loadModel('DmiFlowWiseTablesLists');
+		$this->loadModel('DmiApplicationTypes');
+		$this->loadModel('DmiUsers');
+		$this->loadModel('DmiRoOffices');
+		$this->loadModel('DmiIoAllocationLogs');
+		$this->loadComponent('Customfunctions');
+		$this->loadModel('DmiRtiAllocationsLog'); // log model dedded by shankhpal on 17/05/2023
+
+		$ro_scheduled_date = $this->Customfunctions->dateFormatCheck($ro_scheduled_date);
+
+		$current_level = $this->Session->read('current_level');
+		$username = $this->Session->read('username');
+
+		//get allocating officer user details
+		$get_user_id = $this->DmiUsers->find('all',array('fields'=>'id','conditions'=>array('email IS'=>$username)))->first();
+		
+		$user_id = $get_user_id['id'];
+
+		$appl_type_id = $this->DmiApplicationTypes->find('all',array('conditions'=>array('LOWER(application_type) IS'=>strtolower($appl_type))))->first();
+
+		//this temporary session varible is set for the SMS and Email - Akash [10-10-2022]
+		$_SESSION['application_type_temp'] = $appl_type_id['id'];
+
+		$flow_wise_tables = $this->DmiFlowWiseTablesLists->find('all',array('conditions'=>array('application_type IS'=>$appl_type_id['id'])))->first();
+	
+		$allocation_table = $flow_wise_tables['allocation'];
+		
+		$current_position_table = $flow_wise_tables['appl_current_pos'];
+
+		$this->loadModel($allocation_table);
+		$this->loadModel($current_position_table);
+
+		//get IO user details
+		$user_details = $this->DmiUsers->find('all',array('conditions'=>array('email IS'=>$io_user_id)))->first();
+		$io_posted_id = $user_details['posted_ro_office'];
+
+		//get IO posted office
+		$io_office = $this->DmiRoOffices->find('all',array('conditions'=>array('id IS'=>$io_posted_id)))->first();
+		$io_office = $io_office['ro_office'];
+	
+
+
+		if($current_level=='level_3'){//by RO/SO as nodal office
+	
+			$allocation_type = '0';// 0 & 1 for first Inspection allocation/reallocation
+			$msg_id = 14;
+	
+			//get latest record for allocation
+			$get_latest_id = $this->$allocation_table->find('all',array('conditions'=>array('customer_id IS'=>$customer_id),'order'=>'id DESC'))->first();
+
+			if(!empty($get_latest_id)){
+		
+				if($get_latest_id['level_2'] != null){$allocation_type = '1'; $msg_id = 15;}//to check allocation or reallocation
+
+				$next_level = 'level_2';
+				$mo_column_name = 'level_2';
+			
+			}
+		}
+			
+
+			// this condition used for when first time in allocation tabale have not any entry 
+			//  so we need to add entry first in allocation table 
+				// if(!empty($get_latest_id)){
+
+
+				$this->$allocation_table->updateAll(
+
+					array($mo_column_name=>"$io_user_id",
+					  'current_level'=>"$io_user_id",
+						'modified'=>"$current_date",
+						'ro_scheduled_date'=>"$ro_scheduled_date",
+						'io_scheduled_date'=>"$ro_scheduled_date"),
+					array('id'=>$get_latest_id['id'])
+				);
+
+			
+				
+				  $next_level = 'level_2';
+				  $mo_column_name = 'level_2';
+					//Insert entry in current position table
+				  $this->$current_position_table->currentUserEntry($customer_id,$io_user_id,$next_level);
+
+					// Save the log of allocated application (Done by shankhpal shende on 17/05/2023)
+					$DmiRtiAllocationsLogEntity = $this->DmiRtiAllocationsLog->newEntity(array(
+						
+						$mo_column_name=>$io_user_id,
+						'customer_id'=>$customer_id,
+						'level_3' => $username, 
+						'current_level'=>$io_user_id,
+						'created'=>date('Y-m-d H:i:s'),
+						'modified'=>date('Y-m-d H:i:s'),
+						'ro_scheduled_date'=>$ro_scheduled_date,
+						'io_scheduled_date'=>$ro_scheduled_date
+
+					));
+					$this->DmiRtiAllocationsLog->save($DmiRtiAllocationsLogEntity);
+				
+				#SMS: Rutin Inspection   // commented by shankhpal shende on 09/12/2022
+				//$this->DmiSmsEmailTemplates->sendMessage($msg_id,$customer_id);
+				// }
+
+
+
+					
+			
+				//update current position table
+				$this->$current_position_table->currentUserUpdate($customer_id,$io_user_id,$next_level);
+
+				// Common IO allocation logs, dirrentiate with allocation type nos
+				$allocation_logs_entity = $this->DmiIoAllocationLogs->newEntity(array(
+
+					'customer_id'=>$customer_id,
+					'application_type'=>$appl_type_id['id'],
+					'created'=>$current_date,
+					'user_id'=>$user_id,
+					'io_office'=>$io_office,
+					'io_email_id'=>$io_user_id,
+					'allocation_type'=>$allocation_type
+
+				));
+
+				if($this->DmiIoAllocationLogs->save($allocation_logs_entity)){
+					
+					#SMS: Rutin Inspection   // commented by shankhpal shende on 09/12/2022
+					//$this->DmiSmsEmailTemplates->sendMessage($msg_id,$customer_id); 
+				}
+
+			
+
+			exit;
+
+	}
+
+	
 
 }
 

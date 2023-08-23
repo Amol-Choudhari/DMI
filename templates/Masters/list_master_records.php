@@ -100,6 +100,9 @@
 
                                             echo $this->element('masters_management_elements/list_master_elements/all_documents_list');
 
+                                        } elseif ($masterId == '20') {
+                                            //For Routine Inspections -> Shankhapal Shende [06-12-2022]
+                                            echo $this->element('masters_management_elements/list_master_elements/all_period');
                                         }
                                     ?>
                                 </table>

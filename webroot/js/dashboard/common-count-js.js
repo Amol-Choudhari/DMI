@@ -401,6 +401,46 @@ $("#all_count_box").click(function(){
 								}
 						});
 					});
+
+//for Routine Inspection allocation added by shankhpal shende on 08/12/2022
+          $("#common_app_list_table").on(
+            "click",
+            "#allocate-routine-inspection" + p,
+            function () {
+              var appl_type = $("#appl_type" + p).val();
+              var customer_id = $("#customer_id" + p).val();
+              var comm_with = $("#comm_with" + p).text();
+
+              $.ajax({
+                type: "POST",
+                async: true,
+                url: "../dashboard/open_routine_inspection_allocation_popup",
+                data: {
+                  customer_id: customer_id,
+                  appl_type: appl_type,
+                  comm_with: comm_with,
+                },
+                beforeSend: function (xhr) {
+                  // Add this line
+                  $(".loader").show();
+                  $(".loadermsg").show();
+                  xhr.setRequestHeader(
+                    "X-CSRF-Token",
+                    $('[name="_csrfToken"]').val()
+                  );
+                },
+                success: function (data) {
+                  $(".loader").hide();
+                  $(".loadermsg").hide();
+                  $("#allocation_popup_box").show();
+                  $("#allocation_popup_box").html(data);
+                  $("#inspection_alloction_Modal").show();
+
+                  inspection_alloc_js_call();
+                },
+              });
+            }
+          );
 					
 					
 					
@@ -889,6 +929,10 @@ $("#all_count_box").click(function(){
 		$("#for_scrutiny_of_so_appl_count").text(countarray['scrutiny_allocation_by_level4ro_tab']);
 		$("#for_inspection_allocation_count").text(countarray['inspection_allocation_tab']);
 
+		 $("#for_routine_inspection_count").text(
+      countarray["routine_inspection_allocation_tab"]
+    ); // For Routine Inspection (RTI) added by shankhpal shende on 06/12/2022
+
 		//ajax to fetch listing for Allocation to scrutiny
 		$("#for_scrutiny_allocation_tab").click(function(){
 			$("#allocation_common_applications_list").hide();
@@ -954,6 +998,30 @@ $("#all_count_box").click(function(){
 					}
 			});
 		});
+
+		//ajax to fetch listing for allocation of Routine Inspection (RTI) added by shankhpal on 02/12/2022
+    $("#for_routine_inspection_tab").click(function () {
+      $("#allocation_common_applications_list").hide();
+      $.ajax({
+        type: "POST",
+        async: true,
+        url: "../dashboard/allocation_for_routine_inspection_tab",
+        beforeSend: function (xhr) {
+          // Add this line
+          $(".loader").show();
+          $(".loadermsg").show();
+          xhr.setRequestHeader("X-CSRF-Token", $('[name="_csrfToken"]').val());
+        },
+        success: function (data) {
+          $(".loader").hide();
+          $(".loadermsg").hide();
+          $("#allocation_common_applications_list").show();
+          $("#allocation_common_applications_list").html(data);
+
+          appl_common_list_js_call();
+        },
+      });
+    });
 
 		subTabsClicksEvents();
 
@@ -1048,14 +1116,15 @@ $("#all_count_box").click(function(){
 			$("#inspection_alloction_Modal").hide();
 		});
 		
-		
-		$('.ro_scheduled_date').datepicker({
-			format: "dd/mm/yyyy",
-			autoclose: true,
-			startDate: new Date(),
-			clearBtn: true
-		
-		});
+		//chnges the datepicker added enddate as per change request and suggesions
+    // added by : shankhpal shende -> 16/05/2023
+    $(".ro_scheduled_date").datepicker({
+      format: "dd/mm/yyyy",
+      autoclose: true,
+      startDate: new Date(),
+      endDate: "+2m", // added by shankhpal 16/05/2023
+      clearBtn: true,
+    });
 			
 		//for Inspection allocation
 		$('#inspection_allocate_btn').click(function(){
@@ -1068,7 +1137,13 @@ $("#all_count_box").click(function(){
 			
 			if (appl_type != '' && io_user_id != null && customer_id != '')
 			{
-				
+				 // Check if ro_scheduled_date is empty
+				// added by shankhpal shende on 20/06/2023
+				if (ro_scheduled_date === "") {
+				// Show an error message or perform any other necessary action
+				alert("Please select a scheduled date for Routine Inspection.");
+				return false;
+				}
 				//condition added on 07-02-2023
 				//to check if the application is already allocated.
 				//if yes, then alert user on reallocation of application to get confirmation.
@@ -1098,6 +1173,122 @@ $("#all_count_box").click(function(){
 				return false;
 			}
 		});
+
+		//for Routine Inspection (RTI) allocation added by shankhpal shende
+    $("#routine_inspection_allocate_btn").click(function () {
+      var appl_type = $("#alloc_appl_type").val();
+      var customer_id = $("#alloc_customer_id").val();
+      var io_user_id = $("#io_users_list").val();
+      var ro_scheduled_date = $("#ro_scheduled_date").val();
+
+      if (
+        appl_type != "" &&
+        io_user_id != null &&
+        customer_id != "" &&
+        customer_id != ""
+      ) {
+        // Check if ro_scheduled_date is empty
+        // added by shankhpal shende on 20/06/2023
+        if (ro_scheduled_date === "") {
+          // Show an error message or perform any other necessary action
+          alert("Please select a scheduled date for Routine Inspection.");
+          return false;
+        }
+        $.ajax({
+          type: "POST",
+          async: true,
+          url: "../dashboard/allocate_appl_for_routine_inspection",
+          data: {
+            customer_id: customer_id,
+            appl_type: appl_type,
+            io_user_id: io_user_id,
+            ro_scheduled_date: ro_scheduled_date,
+          },
+          beforeSend: function (xhr) {
+            // Add this line
+            $(".loader").show();
+            $(".loadermsg").show();
+            xhr.setRequestHeader(
+              "X-CSRF-Token",
+              $('[name="_csrfToken"]').val()
+            );
+          },
+          success: function (data) {
+            $(".loader").hide();
+            $(".loadermsg").hide();
+            $("#inspection_alloction_Modal").hide();
+            alert(
+              "The Application " +
+                customer_id +
+                " is successfully allocated for Routine Inspection to IO user." +
+                " " +
+                "Forwarded to:" +
+                atob(io_user_id)
+            );
+            //to reload list after allocation
+            $("#for_routine_inspection_tab").click();
+          },
+        });
+      } else {
+        $.alert("Please Select All Details. It can not be blank");
+        return false;
+      }
+    });
+
+    // Comment: Function added for reallocation tab
+    // Reason: whene click on reallocation button call this function and update record
+    // Date: 18/05/2023
+    // Module: RTI
+    // Author:Shankhpal Shende
+    $("#routine_inspection_re_allocate_btn").click(function () {
+      var appl_type = $("#alloc_appl_type").val();
+      var customer_id = $("#alloc_customer_id").val();
+      var io_user_id = $("#io_users_list").val();
+      var ro_scheduled_date = $("#ro_scheduled_date").val();
+
+      if (
+        appl_type != "" &&
+        io_user_id != null &&
+        customer_id != "" &&
+        customer_id != ""
+      ) {
+        $.ajax({
+          type: "POST",
+          async: true,
+          url: "../dashboard/re_allocate_appl_for_routine_inspection",
+          data: {
+            customer_id: customer_id,
+            appl_type: appl_type,
+            io_user_id: io_user_id,
+            ro_scheduled_date: ro_scheduled_date,
+          },
+          beforeSend: function (xhr) {
+            // Add this line
+            $(".loader").show();
+            $(".loadermsg").show();
+            xhr.setRequestHeader(
+              "X-CSRF-Token",
+              $('[name="_csrfToken"]').val()
+            );
+          },
+          success: function (data) {
+            $(".loader").hide();
+            $(".loadermsg").hide();
+            $("#inspection_alloction_Modal").hide();
+            alert(
+              "The Application " +
+                customer_id +
+                " is successfully allocated for Routine Inspection to IO user."
+            );
+            //to reload list after allocation
+            $("#for_routine_inspection_tab").click();
+          },
+        });
+      } else {
+        $.alert("Please Select All Details. It can not be blank");
+        return false;
+      }
+    });
 	}
 	
 	//added method on 07-02-2023 for common ajax code inspection allocation

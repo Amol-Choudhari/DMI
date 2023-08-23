@@ -1,5 +1,3 @@
-<?php ?>
-
 <?php
 	// SET ACTIVE MENU (HIGHLIGHT CURRENTLY SELECTED MENU) IN LEFT SIDEBAR
 	// By Aniket Ganvir dated 8th DEC 2020
@@ -69,11 +67,11 @@
 
 					<!-- show applicant email details for new audit changes, 25-02-2021, Pravin Bhakare -->
 					<!-- Added on 30-05-2022 For the My Team Function by Akash-->
-					<?php if($current_user_roles['super_admin'] != 'yes') { ?>
+					<?php if ($current_user_roles['super_admin'] != 'yes') { ?>
 
 						<li class="nav-item">
 							<a href="<?php echo $this->request->getAttribute('webroot');?>othermodules/my_team" class="nav-link">
-							<i class="fas fa-users nav-icon"></i>
+								<i class="fas fa-users nav-icon"></i>
 								<p class="nav-icon-p">My Team</p>
 							</a>
 						</li>
@@ -252,43 +250,82 @@
 										<li class="nav-item">
 											<a href="<?php echo $this->request->getAttribute("webroot");?>hoinspections/redirectGrantedApplications/1/old" class="bg-cyan nav-link">
 												<i class="far fa-dot-circle nav-icon"></i>
-												<p class="nav-icon-p">Old Application</p>
+												<p class="nav-icon-p"><b>Old Application</b></p>
 											</a>
 										</li>
 										<li class="nav-item">
-											<a href="<?php echo $this->request->getAttribute("webroot");?>hoinspections/redirectGrantedApplications/1" class="bg-cyan nav-link <?php echo $menu_all_menus; ?>">
+											<a href="<?php echo $this->request->getAttribute("webroot");?>hoinspections/redirectGrantedApplications/1" class="bg-cyan nav-link">
 												<i class="far fa-dot-circle nav-icon"></i>
-												<p class="nav-icon-p">New Application</p>
+												<p class="nav-icon-p"><b>New Application</b></p>
 											</a>
 										</li>
 
 										<li class="nav-item">
-											<a href="<?php echo $this->request->getAttribute("webroot");?>hoinspections/redirectGrantedApplications/2" class="bg-cyan nav-link <?php echo $menu_add_menu; ?>">
+											<a href="<?php echo $this->request->getAttribute("webroot");?>hoinspections/redirectGrantedApplications/2" class="bg-cyan nav-link">
 												<i class="far fa-dot-circle nav-icon"></i>
-												<p class="nav-icon-p">Renewal Application</p>
+												<p class="nav-icon-p"><b>Renewal Application</b></p>
+											</a>
+										</li>
+										<!-- Added option for Change grant list on 01-05-2023 -->
+										<li class="nav-item">
+											<a href="<?php echo $this->request->getAttribute("webroot");?>hoinspections/redirectGrantedApplications/3" class="bg-cyan nav-link">
+												<i class="far fa-dot-circle nav-icon"></i>
+												<p class="nav-icon-p"><b>Change Application</b></p>
 											</a>
 										</li>
 										<li class="nav-item">
-											<a href="<?php echo $this->request->getAttribute("webroot");?>hoinspections/redirectGrantedApplications/5" class="bg-cyan nav-link <?php echo $menu_add_menu; ?>">
+											<a href="<?php echo $this->request->getAttribute("webroot");?>hoinspections/redirectGrantedApplications/5" class="bg-cyan nav-link">
 												<i class="far fa-dot-circle nav-icon"></i>
-												<p class="nav-icon-p">Approval for 15 Digit Code</p>
+												<p class="nav-icon-p"><b>Approval for 15 Digit Code</b></p>
 											</a>
 										</li>
 										<li class="nav-item">
-											<a href="<?php echo $this->request->getAttribute("webroot");?>hoinspections/redirectGrantedApplications/6" class="bg-cyan nav-link <?php echo $menu_add_menu; ?>">
+											<a href="<?php echo $this->request->getAttribute("webroot");?>hoinspections/redirectGrantedApplications/6" class="bg-cyan nav-link">
 												<i class="far fa-dot-circle nav-icon"></i>
-												<p class="nav-icon-p">Approval for E-Code</p>
+												<p class="nav-icon-p"><b>Approval for E-Code</b></p>
+											</a>
+										</li>
+										<li class="nav-item">
+											<a href="<?php echo $this->request->getAttribute('webroot');?>hoinspections/redirectGrantedApplications/9" class="bg-cyan nav-link">
+												<i class="far fa-dot-circle nav-icon"></i>
+												<p class="nav-icon-p"><b>Surrender Applications</b></p>
+											</a>
+										</li>
+										
+										
+										 <!-- added new submenu chemist approval in granted application menu by Laxmi On 29-05-2023 -->
+										<li class="nav-item">
+											<a href="<?php echo $this->request->getAttribute("webroot");?>hoinspections/redirectGrantedApplications/4" class="bg-cyan nav-link ">
+												<i class="far fa-dot-circle nav-icon"></i>
+												<p class="nav-icon-p"><b>Approval for Chemist</b></p>
+											</a>
+										</li>
+
+										<li class="nav-item">
+											<a href="<?php echo $this->request->getAttribute('webroot');?>othermodules/list_of_suspended_firms/" class="bg-cyan nav-link">
+												<i class="far fa-dot-circle nav-icon"></i>
+												<p class="nav-icon-p"><b>Suspended Applications</b></p>
+											</a>
+										</li>
+										<li class="nav-item">
+											<a href="<?php echo $this->request->getAttribute('webroot');?>othermodules/list_of_cancelled_firms/" class="bg-cyan nav-link">
+												<i class="far fa-dot-circle nav-icon"></i>
+												<p class="nav-icon-p"><b>Cancelled Applications</b></p>
 											</a>
 										</li>
 									</li>
 								</ul>
 							</li>
 						</li>
+						
+					<?php } if ($current_user_roles['ro_inspection'] == 'yes' || $current_user_roles['so_inspection']=='yes' || 
+								$current_user_roles['dy_ama'] == 'yes' || $current_user_roles['jt_ama'] == 'yes' ||
+								$current_user_roles['ama'] == 'yes' || $current_user_roles['super_admin'] == 'yes' || $current_user_roles['pao'] == 'yes') { ?>
 
 						<!-- below li added on 07-09-2022  -->
 						<li class="nav-item">
 							<a href="<?php echo $this->request->getAttribute('webroot');?>hoinspections/rejectedApplList" class="nav-link <?php echo $menu_add_menu; ?>">
-								<i class="far fas fa-close nav-icon"></i>
+								<i class="fas fa-exclamation-triangle nav-icon"></i>
 								<p>Rejected/Junked Appl.</p>
 							</a>
 						</li>
@@ -306,21 +343,21 @@
 									<li class="nav-item has-treeview">
 										<!-- Added for update firm details option menu for secondary firms that is for RO / SO user on 29-12-2021 by AKASH -->
 										<li class="nav-item">
-											<a href="<?php echo $this->request->getAttribute('webroot'); ?>othermodules/firms_list_to_update" class="nav-link">
+											<a href="<?php echo $this->request->getAttribute('webroot'); ?>othermodules/firms_list_to_update" class="bg-success nav-link">
 												<i class="fas fa-user-edit nav-icon"></i>
-												<p class="nav-icon-p">Update Firm Details</p>
+												<p class="nav-icon-p"><b>Update Firm Details</b></p>
 											</a>
 										</li>
 										<li class="nav-item">
-											<a href="<?php echo $this->request->getAttribute('webroot');?>othermodules/re_esign_module" class="nav-link">
+											<a href="<?php echo $this->request->getAttribute('webroot');?>othermodules/re_esign_module" class="bg-success nav-link">
 												<i class="fas fa-redo-alt nav-icon"></i>
-												<p class="nav-icon-p">Re-esign</p>
+												<p class="nav-icon-p"><b>Re-esign</b></p>
 											</a>
 										</li>
 										<li class="nav-item">
-											<a href="<?php echo $this->request->getAttribute('webroot');?>othermodules/user_work_transfer" class="nav-link">
+											<a href="<?php echo $this->request->getAttribute('webroot');?>othermodules/user_work_transfer" class="bg-success nav-link">
 												<i class="fas fa-retweet nav-icon"></i>
-												<p class="nav-icon-p">Work Transfer</p>
+												<p class="nav-icon-p"><b>Work Transfer</b></p>
 											</a>
 										</li>
 										<!-- new menu added on 22-06-2023 by Amol for RO Incharge -->
@@ -333,6 +370,12 @@
 											</li>
 										<?php } ?>
 										
+									</li>
+									<li class="nav-item">
+										<a href="<?php echo $this->request->getAttribute('webroot');?>othermodules/routine_inspection_list" class="bg-success nav-link">
+											<i class="fas fa-retweet nav-icon"></i>
+											<p class="nav-icon-p"><b>Routine Inspection</b></p>
+										</a>
 									</li>
 								</ul>
 							</li>
@@ -347,19 +390,19 @@
 								<ul class="nav nav-treeview ">
 									<li class="nav-item has-treeview">
 										<li class="nav-item">
-											<a href="<?php echo $this->request->getAttribute('webroot');?>users/replica_alloted_list" class="nav-link">
+											<a href="<?php echo $this->request->getAttribute('webroot');?>users/replica_alloted_list" class="bg-Gray Dark nav-link">
 												<i class="fas fa-info-circle nav-icon"></i>
 												<p class="nav-icon-p">Replica Alloted List</p>
 											</a>
 										</li>
 										<li class="nav-item">
-											<a href="<?php echo $this->request->getAttribute('webroot');?>users/alloted15_digit_list" class="nav-link">
+											<a href="<?php echo $this->request->getAttribute('webroot');?>users/alloted15_digit_list" class="bg-Gray Dark nav-link">
 												<i class="fas fa-info-circle nav-icon"></i>
 												<p class="nav-icon-p">Alloted 15 Digit Code</p>
 											</a>
 										</li>
 										<li class="nav-item">
-											<a href="<?php echo $this->request->getAttribute('webroot');?>users/alloted_e_code_list" class="nav-link">
+											<a href="<?php echo $this->request->getAttribute('webroot');?>users/alloted_e_code_list" class="bg-Gray Dark nav-link">
 												<i class="fas fa-info-circle nav-icon"></i>
 												<p class="nav-icon-p">Alloted E-Code</p>
 											</a>
@@ -460,12 +503,12 @@
 						<!-- below li added on 07-09-2022  -->
 						<li class="nav-item">
 							<a href="<?php echo $this->request->getAttribute('webroot');?>hoinspections/rejectedApplList" class="nav-link <?php echo $menu_add_menu; ?>">
-								<i class="far fas fa-close nav-icon"></i>
+								<i class="fas fa-exclamation-triangle nav-icon"></i>
 								<p>Rejected/Junked Appl.</p>
 							</a>
 						</li>
 
-					<?php }?>
+					<?php } ?>
 				
 					<?php if (($current_user_roles['ro_inspection'] == 'yes' || $current_user_roles['so_inspection'] == 'yes' || $current_user_roles['pao'] == 'yes') && $current_user_roles['super_admin'] != 'yes') { ?>
 
@@ -476,7 +519,7 @@
 							</a>
 						</li>
 
-					<?php }?>
+					<?php } ?>
 
 					<!-- Added for update firm details option menu for primay firms that is for admin on 29-12-2021 by AKASH -->
 					<?php if ($current_user_roles['super_admin'] == 'yes') { ?>
@@ -487,15 +530,30 @@
 								<p class="nav-icon-p">Update Firm Details</p>
 							</a>
 						</li>
-						
+
 						<!-- new menu added on 27-06-2023 by Amol for HO Admin -->
 						<li class="nav-item">
 							<a href="<?php echo $this->request->getAttribute('webroot');?>othermodules/get_ro_wise_pending_appl" class="nav-link">
-								<i class="fas fa-retweet nav-icon"></i>
+								<i class="fas fa-list-ol nav-icon"></i>
 								<p class="nav-icon-p"><b>RO Wise Pending</b></p>
 							</a>
 						</li>
 
+						<!-- new menu added on 09-08-2023 by Akash for HO Admin to set the renewal entries in database -->
+						<li class="nav-item">
+							<a href="<?php echo $this->request->getAttribute('webroot');?>othermodules/renewalApplicationReset" class="nav-link">
+								<i class="fas fa-list nav-icon"></i>
+								<p class="nav-icon-p">Renewal Application Reset</p>
+							</a>
+						</li>
+
+						<!-- new menu added on 09-08-2023 by Amol for HO Admin to mark the junk applications in database -->
+						<li class="nav-item">
+							<a href="<?php echo $this->request->getAttribute('webroot');?>othermodules/markApplRejected" class="nav-link">
+								<i class="fas fa-times-circle nav-icon"></i>
+								<p class="nav-icon-p">Mark Application Rejected</p>
+							</a>
+						</li>
 					<?php } ?>
 					
 					<!-- added for testing user redirect for DMI and LMIS -->

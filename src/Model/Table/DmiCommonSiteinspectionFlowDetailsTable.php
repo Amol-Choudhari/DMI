@@ -83,12 +83,17 @@
 								
 				$model = TableRegistry::getTableLocator()->get($model_name);
 				
-				$list_report_id = $model->find('list', array('valueField'=>'id', 'conditions'=>array('customer_id IS'=>$customer_id, $grantDateCondition)))->toArray();
+				//$list_report_id = $model->find('list', array('valueField'=>'id', 'conditions'=>array('customer_id IS'=>$customer_id, $grantDateCondition)))->toArray();
+				
+				//above query commented and write below single query to fetch last record
+				//on 21-08-2023 by Amol, to resolve issue for application not geting listed for RO, which was replied by HO and again sent to IO or Applicant and come back to RO
+				//to sent comment to HO again
+				$find_last_status = $model->find('all', array('fields'=>'form_status', 'conditions'=>array('customer_id IS'=>$customer_id, $grantDateCondition),'order'=>'id desc'))->first();
 						
-				if(!empty($list_report_id))
+				if(!empty($find_last_status))
 				{
-					
-					$find_last_status = $model->find('all', array('fields'=>'form_status', 'conditions'=>array('id'=>max($list_report_id))))->first();
+					//below query commented on 21-08-2023 by Amol, not required as used above single query for last record.
+					//$find_last_status = $model->find('all', array('fields'=>'form_status', 'conditions'=>array('id IS'=>max($list_report_id))))->first();
 					$report_status = $find_last_status['form_status'];	
 				
 					if($report_status != 'approved')

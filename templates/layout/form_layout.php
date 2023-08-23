@@ -73,6 +73,8 @@
 			echo $this->Html->script('laboratory_forms_validations');
 			echo $this->Html->script('ca_forms_validations');
 			echo $this->Html->script('printing_forms_validations_new');
+			echo $this->Html->script('Validations/surrender_form_validations');
+
 		?>
 	</head>
 

@@ -64,7 +64,9 @@
 	<?php } ?>
 
 
-	<?php echo $this->Form->control('changefields', array('type'=>'hidden', 'id'=>'changefields', 'value'=>$changefields,'label'=>false,)); ?>
+	<?php 
+	//commented on 13-04-2023 as per change updates
+	//echo $this->Form->control('changefields', array('type'=>'hidden', 'id'=>'changefields', 'value'=>$changefields,'label'=>false,)); ?>
 
 	<input type="hidden" id="oldapplication_call" value="<?php echo $oldapplication; ?>">
 

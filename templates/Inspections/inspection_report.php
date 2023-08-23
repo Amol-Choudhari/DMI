@@ -14,7 +14,7 @@
 <!-- Call element of declaration message box out of form tag on 31-05-2021 by Amol for Form base method -->
 
 <!-- for Report esign -->
-	<?php if ($current_level == 'level_2' && ($application_type == 1 || $application_type == 5 || $application_type == 6) && $form_type != 'F' ) {
+	<?php if ($current_level == 'level_2' && ($application_type == 1 || $application_type == 5 || $application_type == 6 || $application_type == 10) && $form_type != 'F' ) {
 				echo $this->element('esign_views/declaration-message_boxes'); ?>
 		<!-- for Certificate esign -->
 	<?php } elseif ($final_granted_btn == 'yes') {
@@ -25,7 +25,7 @@
 </div>
 
 <input type="hidden" id="current_level" value="<?php echo $_SESSION['current_level']; ?>">
-<input type="hidden" id="final_submit_status_ir" value="<?php echo $final_submit_status; ?>">
+<input type="hidden" id="final_submit_status_ir" value="<?php echo json_encode($final_submit_status); ?>"><!-- added json_encode() on 16-08-2023 by Amol -->
 <input type="hidden" id="section_form_details" value="<?php echo $section_form_details[0]['form_status']; ?>">
 
 <?php echo $this->Html->script('inspection/inspection'); ?>

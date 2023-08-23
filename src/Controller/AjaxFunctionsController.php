@@ -117,7 +117,15 @@ class AjaxFunctionsController extends AppController{
 	public function editMachineId() {
 
 		$this->autoRender = false;
-		$this->loadModel('DmiAllMachinesDetails');
+		//$this->loadModel('DmiAllMachinesDetails');
+		
+		$applicationType = $this->Session->read('application_type');
+		//added condition for Change module on 14-04-2023 by Amol
+		if ($applicationType == 3) {
+			$DmiAllMachinesDetails = TableRegistry::getTableLocator()->get('DmiChangeAllMachinesDetails');
+		} else {
+			$DmiAllMachinesDetails = TableRegistry::getTableLocator()->get('DmiAllMachinesDetails');
+		}
 
 		$customer_id = $this->Customfunctions->sessionCustomerID();
 		$firm_type = $this->Customfunctions->firmType($customer_id);
@@ -144,7 +152,7 @@ class AjaxFunctionsController extends AppController{
 
 			if (!empty($edit_machine_id)) {
 
-				$find_machines_details = $this->DmiAllMachinesDetails->find('all',array('conditions'=>array('id IS'=>$edit_machine_id)))->first();
+				$find_machines_details = $DmiAllMachinesDetails->find('all',array('conditions'=>array('id IS'=>$edit_machine_id)))->first();
 				$this->set('find_machines_details',$find_machines_details);
 
 				$machine_type_value_edit = $find_machines_details['machine_type'];
@@ -159,11 +167,11 @@ class AjaxFunctionsController extends AppController{
 			$machine_type = htmlentities($_POST['machine_type'], ENT_QUOTES);
 			$machine_no = htmlentities($_POST['machine_no'], ENT_QUOTES);
 			$machine_capacity = htmlentities($_POST['machine_capacity'], ENT_QUOTES);
-			$save_details_result = $this->DmiAllMachinesDetails->editMachineDetails($record_id,$machine_name,$machine_type,$machine_no,$machine_capacity);// call custome method from model
+			$save_details_result = $DmiAllMachinesDetails->editMachineDetails($record_id,$machine_name,$machine_type,$machine_no,$machine_capacity);// call custome method from model
 			$this->Session->delete('edit_machine_id');
 		}
 
-		$added_machines_details[1] = $this->DmiAllMachinesDetails->machineDetails($firm_type);
+		$added_machines_details[1] = $DmiAllMachinesDetails->machineDetails($firm_type);
 		$this->Set('section_form_details',$added_machines_details);
 		
 		//this below call is modified "Element" changed to "element" as it declining the path on server by AKASH THAKRE on 23-03-2022
@@ -181,7 +189,16 @@ class AjaxFunctionsController extends AppController{
 	public function addMachineDetails() {
 		
 		$this->autoRender = false;
-		$this->loadModel('DmiAllMachinesDetails');
+		//$this->loadModel('DmiAllMachinesDetails');
+		
+		$applicationType = $this->Session->read('application_type');
+		//added condition for Change module on 14-04-2023 by Amol
+		if ($applicationType == 3) {
+			$DmiAllMachinesDetails = TableRegistry::getTableLocator()->get('DmiChangeAllMachinesDetails');
+		} else {
+			$DmiAllMachinesDetails = TableRegistry::getTableLocator()->get('DmiAllMachinesDetails');
+		}
+		
 
 		$customer_id = $this->Customfunctions->sessionCustomerID();
 		$firm_type = $this->Customfunctions->firmType($customer_id);
@@ -191,8 +208,8 @@ class AjaxFunctionsController extends AppController{
 		$machine_no = htmlentities($_POST['machine_no'], ENT_QUOTES);
 		$machine_capacity = htmlentities($_POST['machine_capacity'], ENT_QUOTES);
 
-		$save_details_result = $this->DmiAllMachinesDetails->saveMachineDetails($machine_name,$machine_type,$machine_no,$machine_capacity);// call custome method from model
-		$added_machines_details[1] = $this->DmiAllMachinesDetails->machineDetails($firm_type);
+		$save_details_result = $DmiAllMachinesDetails->saveMachineDetails($machine_name,$machine_type,$machine_no,$machine_capacity);// call custome method from model
+		$added_machines_details[1] = $DmiAllMachinesDetails->machineDetails($firm_type);
 		$this->Set('section_form_details',$added_machines_details);
 		
 		//this below call is modified "Element" changed to "element" as it declining the path on server by AKASH THAKRE on 23-03-2022
@@ -210,16 +227,24 @@ class AjaxFunctionsController extends AppController{
 	public function deleteMachineId() {
 		
 		$this->Session->delete('edit_machine_id');
-		$this->loadModel('DmiAllMachinesDetails');
+		//$this->loadModel('DmiAllMachinesDetails');
+		
+		$applicationType = $this->Session->read('application_type');
+		//added condition for Change module on 14-04-2023 by Amol
+		if ($applicationType == 3) {
+			$DmiAllMachinesDetails = TableRegistry::getTableLocator()->get('DmiChangeAllMachinesDetails');
+		} else {
+			$DmiAllMachinesDetails = TableRegistry::getTableLocator()->get('DmiAllMachinesDetails');
+		}
 
 		$customer_id = $this->Customfunctions->sessionCustomerID();
 		$firm_type = $this->Customfunctions->firmType($customer_id);
 
 		//$record_id = $id;
 		$record_id = $_POST['delete_machine_id'];
-		$machine_delete_result = $this->DmiAllMachinesDetails->deleteMachineDetails($record_id);// call to custome function from model
+		$machine_delete_result = $DmiAllMachinesDetails->deleteMachineDetails($record_id);// call to custome function from model
 
-		$added_machines_details[1] = $this->DmiAllMachinesDetails->machineDetails($firm_type);
+		$added_machines_details[1] = $DmiAllMachinesDetails->machineDetails($firm_type);
 		$this->Set('section_form_details',$added_machines_details);
 		
 		//this below call is modified "Element" changed to "element" as it declining the path on server by AKASH THAKRE on 23-03-2022
@@ -524,6 +549,7 @@ class AjaxFunctionsController extends AppController{
 	public function addDirectorsDetails() {
 
 		$applicationType = $this->Session->read('application_type');
+		//added condition for Change module on 14-04-2023 by Amol
 		if ($applicationType == 3) {
 			$DmiAllDirectorsDetails = TableRegistry::getTableLocator()->get('DmiChangeDirectorsDetails');
 		} else {
@@ -558,6 +584,7 @@ class AjaxFunctionsController extends AppController{
 	public function editDirectorsDetailsId() {
 
 		$applicationType = $this->Session->read('application_type');
+		//added condition for Change module on 14-04-2023 by Amol
 		if ($applicationType == 3) {
 			$DmiAllDirectorsDetails = TableRegistry::getTableLocator()->get('DmiChangeDirectorsDetails');
 		} else {
@@ -1703,44 +1730,55 @@ class AjaxFunctionsController extends AppController{
 		$check_user_role = $this->DmiUserRoles->find('all',array('conditions'=>array('user_email_id IS'=>$username)))->first();
 		$this->loadComponent('Randomfunctions');
 		$resultArray = $this->Randomfunctions->dashboardApplicationSearch($customer_id,$check_user_role);
-
+		
 		//below rejected data fetch using customer id if rejected status is rejected by laxmi on 13-01-2023
 		$this->loadModel('DmiRejectedApplLogs');
-        $rejectedData = $this->DmiRejectedApplLogs->find('all',array('conditions'=>array('customer_id IS'=>$customer_id)))->last();
+		$rejectedData = $this->DmiRejectedApplLogs->find('all',array('conditions'=>array('customer_id IS'=>$customer_id)))->last();
+
+		//Check If application is surrender - Akash [10-05-2023]
+		$isApplSurrender = $this->Customfunctions->isApplicationSurrendered($customer_id);
 
 		if ($resultArray['no_result']==null) {
 
-			echo "<table class='table'>
+			//Check if the Application is Surrendered
+			if (!empty($isApplSurrender)) {
+				echo "<b>This Application is Surrendered on ".$isApplSurrender." and no longer available.</b>";
+			} else {
+				echo "<table class='table table-sm'>
 					<thead>
 						<tr>
 							<th>Application Id</th>
+							<th>Firm Name</th>
 							<th>District</th>
 							<th>Position</th>
 							<th>Process</th>
 							<th>Available With</th>
 							<th>Status</th>";
-						  
 
-			echo "</tr>
-				</thead>
-				<tbody>
-					<tr>
-						<td>".$customer_id."</td>
-						<td>".$resultArray['firm_data']['district']."</td>
-						<td>".$resultArray['current_position']."</td>
-						<td>".$resultArray['process']."</td>
-						<td>".$resultArray['currentPositionUser']." <br>( ".$resultArray['getEmailCurrent']." )"."</td> ";
-						//added by laxmi on 13-12-23
-						if(!empty($rejectedData['customer_id']) && $rejectedData['customer_id'] == $customer_id){
-							echo "<td>Rejected</td>";
-						}else{//added appl_status on 19-07-2023 by Amol
-							echo "<td>".$resultArray['appl_status']."</td>";
-						} 
 
-			echo "</tr>
-				</tbody>
-			</table>";
+					echo "</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>".$customer_id."</td>
+							<td>".$resultArray['firm_data']['firm_name']."</td>
+							<td>".$resultArray['firm_data']['district']."</td>
+							<td>".$resultArray['current_position']."</td>
+							<td>".$resultArray['process']."</td>
+							<td>".$resultArray['currentPositionUser']." <br>( ".$resultArray['getEmailCurrent']." )"."</td> ";
+							//added by laxmi on 13-12-23
+							if(!empty($rejectedData['customer_id']) && $rejectedData['customer_id'] == $customer_id){
+								echo "<td>Rejected</td>";
+							}else{//added appl_status on 19-07-2023 by Amol
+								echo "<td>".$resultArray['appl_status']."</td>";
+							} 
 
+					echo "</tr>
+					</tbody>
+				</table>";
+			}
+
+			
 		}else{
 			echo $resultArray['no_result'];
 		}
@@ -2089,7 +2127,466 @@ class AjaxFunctionsController extends AppController{
 		}
 		exit;
 	}	
+
+
+	// Description : The attachedPpDelete function are use for delete attached printing press and labortory,
+	// Author : Shankhpal Shende
+	// Date : 03/05/2023
+	// For Module : attached pp/lab/wonlab
+	public function attachedPpLabDelete(){
+
+		$this->autoRender = false;
+		$this->loadModel('DmiCaPpLabMapings');
+		$this->loadModel('DmiCaPpLabActionLogs');
+		$this->loadModel('DmiCaMappingOwnLabDetails');
+
+		$record_id = $_POST['record_id'];
+		$remark = $_POST['remark'];
 	
+		//get customer_id
+		if ($this->Session->read('customer_id')==null) {
+			$customer_id = $this->Session->read('username');
+		} else {
+			$customer_id = $this->Session->read('customer_id');
+		}
+
+	
+		$current_ip = $_SERVER['REMOTE_ADDR'];
+		if ($current_ip == '::1') { $current_ip = '127.0.0.1'; }
+
+		$action_perform = '';
+		if (!empty($capplabdetails) && $capplabdetails['pp_id']) {
+				$action_perform = 'Printing Press (Removed)';
+		} else {
+				$action_perform = 'Laboratory (Removed)'; // Set the desired action here
+		}
+		
+		//add record in log table
+		$logArray = array(
+			'customer_id'=>$customer_id,
+			'ipaddress'=>$current_ip,
+			'action_perform'=>$action_perform,
+			'created'=>date('Y-m-d H:i:s'),
+			'status'=>'Success'
+		);
+
+		$logTableEntity = $this->DmiCaPpLabActionLogs->newEntity($logArray);
+		$this->DmiCaPpLabActionLogs->save($logTableEntity);
+		#update record add delete status yes and remark
+		if (strpos($record_id, "/Own") !== false) {
+			
+			//get firm details
+			$capplabdetails = $this->DmiCaPpLabMapings->pplabDetails($customer_id,$record_id);
+
+			$recordidArray = explode("/", $record_id);
+			$ownlabId = $recordidArray[0];
+
+			//get array
+			$attached_lab_data = $this->DmiCaPpLabMapings->find('all', ['conditions' => ['customer_id IS' => $customer_id,
+			'lab_id IS NOT NULL','delete_status IS NULL'],'order' => ['id' => 'desc'],'limit' => 1])->first();
+			
+			$record_id = $attached_lab_data['id'];
+
+			$save_details_result = $this->DmiCaPpLabMapings->updateAll(array('remark'=>$remark,'delete_status'=>'yes','modified'=>date('Y-m-d H:i:s')),array('id'=>$record_id));
+
+			$this->DmiCaMappingOwnLabDetails->updateAll(array('delete_status'=>'yes','modified'=>date('Y-m-d H:i:s')),array('id'=>$ownlabId));
+
+		} else {
+			
+			$save_details_result = $this->DmiCaPpLabMapings->updateAll(array('remark'=>$remark,'delete_status'=>'yes','modified'=>date('Y-m-d H:i:s')),array('id'=>$record_id));
+		}
+
+		if (empty($save_details_result)) {
+			echo 'no';
+		}else{
+			echo 'yes';
+		}
+	}
+
+	// Description : The getAllotedReplicaList function are use to get Replica Allotment list of Printing press, laboratory.
+	// Author : Shankhpal Shende
+	// Date : 10/05/2023
+	// For Module : attached pp/lab/wonlab
+	public function getAllotedReplicaList(){
+
+		$this->autoRender = false;
+		$this->loadModel('DmiCaPpLabMapings');
+		$this->loadModel('DmiCaMappingOwnLabDetails');
+
+		$record_id = $_POST['record_id'];
+
+		if (strpos($record_id, "/Own") !== false) {
+			$recordidArray = explode("/", $record_id);
+			$ownlabId = $recordidArray[0];
+			
+			$find_lab_details = $this->DmiCaMappingOwnLabDetails->find('all', array(
+					'conditions' => array(
+							'id' => $ownlabId
+					)
+			))->first();
+		
+			$lab_id = $find_lab_details['own_lab_id'];
+			
+		} else {
+			$find_details = $this->DmiCaPpLabMapings->find('all', array(
+					'conditions' => array(
+							'id' => $record_id
+					)
+			))->first();
+
+			if (!empty($find_details)) {
+					$lab_id = $find_details['lab_id'];
+			}
+		}
+
+		if (!empty($lab_id)) {
+			$get_replica_allot_details = $this->DmiCaPpLabMapings->getReplicaAllotmentDetails($lab_id);
+		} else {
+			$pp_id = $find_details['pp_id'] ?? null;
+			if (!empty($pp_id)) {
+					$get_replica_allot_details = $this->DmiCaPpLabMapings->getReplicaAllotmentDetails($pp_id);
+			}
+		}
+	
+		if (!empty($get_replica_allot_details)) {
+
+			$response = "<div style='overflow: auto; max-height: 300px;'>";
+			$response .= "<table class='myTable table-bordered' id='$record_id'>";
+			$response .= "<thead>";
+			$response .= "<tr>";
+			$response .= "<th>Replica From</th>";
+			$response .= "<th>Replica To</th>";
+			$response .= "<th>Date</th>";
+			$response .= "</tr>";
+			$response .= "</thead>";
+			$response .= "<tbody>";
+
+			foreach ($get_replica_allot_details as $row) {
+
+				$alloted_rep_from = $row['alloted_rep_from'];
+				$alloted_rep_to = $row['alloted_rep_to'];
+				$created = $row['created'];
+				$response .= "<tr>";
+				$response .= "<td>".$alloted_rep_from."</td>";
+				$response .= "<td>".$alloted_rep_to."</td>";
+				$response .= "<td>".$created."</td>";
+				$response .= "</tr>";
+			}
+
+			$response .= "</tbody>";
+			$response .= "</table>";
+			$response .= "<label>";
+			$response .= "Please Enter Remark";
+			$response .="</label>";
+			$response .="<textarea class='form-control' id='remark' rows='3'>";
+
+			echo $response;
+			exit;
+		}else{
+			
+			$response = "<table class='myTable table-bordered' id='" . $record_id ."'>";
+			$response .= "<thead>";
+			$response .= "<tr>";
+			$response .= "<th>Replica From</th>";
+			$response .= "<th>Replica To</th>";
+			$response .= "<th>Date</th>";
+			$response .= "</tr>";
+			$response .= "</thead>";
+			$response .= "<tbody>";
+			$response .= "<tr>";
+			$response .= "<td colspan='3' class='fs-4 text-center'>";
+			$response .= "NO Records Available";
+			$response .= "</td>";
+			$response .= "</tr>";
+			$response .= "</tbody>";
+			$response .= "</table>";
+			$response .= "<label>";
+			$response .= "Remark For delete printing press";
+			$response .="</label>";
+			$response .="<textarea class='form-control' id='remark' rows='3'>";
+			echo $response;
+			exit;
+
+		}
+	}
+
+	// ADD SAMPLE DETAILS
+	// @AUTHOR : SHANKHPAL SHENDE
+	// Description : For adding the sample details created for Routine Inspection flow  (RTI)
+	// DATE : 21/12/2022
+
+	// function updated on 13/06/2023 by shankhpal shende
+  
+	public function addSampleDetails() {
+		
+		$this->autoRender = false;
+		$this->loadModel('DmiCheckSamples');
+		// call customes Controller 
+		$CustomersController = new CustomersController;
+		$customer_id = $this->Customfunctions->sessionCustomerID();
+		// added version for inserting version in this table by shankhpal on 08/06/2023
+		$current_version = $CustomersController->Customfunctions->currentVersion($customer_id);
+		
+		$firm_type = $this->Customfunctions->firmType($customer_id);
+		// change name
+		$commodity_code = htmlentities($_POST['commodity_name'], ENT_QUOTES);
+		
+		$pack_size = htmlentities($_POST['pack_size'], ENT_QUOTES);
+		$lot_no = htmlentities($_POST['lot_no'], ENT_QUOTES);
+		$date_of_packing = htmlentities($_POST['date_of_packing'], ENT_QUOTES);
+		$best_before = htmlentities($_POST['best_before'], ENT_QUOTES);
+		$replica_si_no = htmlentities($_POST['replica_si_no'], ENT_QUOTES);
+
+		$save_details_result = $this->DmiCheckSamples->saveSampleDetails($commodity_code,$pack_size,$lot_no,$date_of_packing,$best_before,$replica_si_no,$current_version);// call custome method from model
+		
+		$added_sample_details = $this->DmiCheckSamples->RoutineInspectionSampleDetails();
+		
+		$this->Set('section_form_details',$added_sample_details);
+		
+		$this->render('/element/rti_addmore_element/rti_addmore_element');
+	}
+
+
+
+	// Add Package Details
+	// @AUTHOR : SHANKHPAL SHENDE
+	// Description : To add package details created for Routine Inspection flow  (RTI)
+	// DATE : 27/12/2022
+  
+	public function addPackageDetails() {
+		
+		$this->autoRender = false;
+		$this->loadModel('DmiRtiPackerDetails');
+
+		$customer_id = $this->Customfunctions->sessionCustomerID();
+
+		$CustomersController = new CustomersController;
+		// added version for inserting version in this table by shankhpal on 08/06/2023
+		$current_version = $CustomersController->Customfunctions->currentVersion($customer_id);
+
+		$packer_id = htmlentities($_POST['packer_id'], ENT_QUOTES);
+		$indent = htmlentities($_POST['indent'], ENT_QUOTES);
+		$supplied = htmlentities($_POST['supplied'], ENT_QUOTES);
+		$balance = htmlentities($_POST['balance'], ENT_QUOTES);
+		$tbl_name = htmlentities($_POST['tbl_name'], ENT_QUOTES);
+
+		$save_details_result = $this->DmiRtiPackerDetails->savePackageingDetails($packer_id,$indent,$supplied,$balance,$tbl_name,$current_version);// call custome method from model
+		$added_packaging_details = $this->DmiRtiPackerDetails->packagingDetails();
+
+		$this->Set('section_form_details',$added_packaging_details);
+		
+		$this->render('/element/rti_addmore_element/rti_addmore_element_pp');
+	}
+
+		
+	// edit Sample Id
+	// @AUTHOR : SHANKHPAL SHENDE
+	// Description : To edit sample details created for Routine Inspection flow  (RTI)
+	// DATE : 28/12/2022 
+		
+	public function editSampleId() {
+
+		$this->autoRender = false;
+		$this->loadModel('DmiCheckSamples');
+
+		$customer_id = $this->Customfunctions->sessionCustomerID();
+		$firm_type = $this->Customfunctions->firmType($customer_id);
+
+		if ($this->Session->read('edit_sample_id')==null) {
+
+			$edit_sample_id = $_POST['edit_sample_id'];
+			$this->Session->write('edit_sample_id',$edit_sample_id);
+
+		} elseif ($_POST['edit_sample_id'] != $this->Session->read('edit_sample_id')) {
+
+			if ($_POST['edit_sample_id'] == '') {
+				$save_sample_id = $_POST['save_sample_id'];
+			} else {
+
+				$edit_sample_id = $_POST['edit_sample_id'];
+				$this->Session->write('edit_sample_id',$edit_sample_id);
+			}
+		}
+
+		if ($this->Session->read('edit_sample_id') != null) {
+
+			if (!empty($edit_sample_id)) {
+
+				$find_sample_details = $this->DmiCheckSamples->find('all',array('conditions'=>array('id IS'=>$edit_sample_id)))->first();
+				
+				$this->set('find_sample_details',$find_sample_details);
+			}
+		}
+
+		if (!empty($save_sample_id)) {
+
+			$record_id = $this->Session->read('edit_sample_id');
+			$commodity_name = htmlentities($_POST['commodity_name'], ENT_QUOTES);
+			$pack_size = htmlentities($_POST['pack_size'], ENT_QUOTES);
+			$lot_no = htmlentities($_POST['lot_no'], ENT_QUOTES);
+			$date_of_packing = htmlentities($_POST['date_of_packing'], ENT_QUOTES);
+			$best_before = htmlentities($_POST['best_before'], ENT_QUOTES);
+			$replica_si_no = htmlentities($_POST['replica_si_no'], ENT_QUOTES);
+
+			$save_details_result = $this->DmiCheckSamples->editSampleDetails($record_id,$commodity_name,$pack_size,$lot_no,$date_of_packing,$best_before,$replica_si_no);// call custome method from model
+			$this->Session->delete('edit_sample_id');
+		}
+
+		$added_sample_details = $this->DmiCheckSamples->RoutineInspectionSampleDetails();
+
+		$this->Set('section_form_details',$added_sample_details);
+	
+		$this->render('/element/rti_addmore_element/rti_addmore_element');
+		
+	}
+
+
+		
+	// Delete Sample Id
+	// @AUTHOR : SHANKHPAL SHENDE
+	// Description : created for Routine Inspection flow  (RTI)
+	// DATE : 28/12/2022 
+
+	public function deleteSampleId() {
+		
+		$this->Session->delete('edit_sample_id');
+		$this->loadModel('DmiCheckSamples');
+
+		$customer_id = $this->Customfunctions->sessionCustomerID();
+		$firm_type = $this->Customfunctions->firmType($customer_id);
+
+		//$record_id = $id;
+		$record_id = $_POST['delete_sample_id'];
+		$sample_delete_result = $this->DmiCheckSamples->deleteSampleDetails($record_id);// call to custome function from model
+   	
+		$added_sample_details = $this->DmiCheckSamples->RoutineInspectionSampleDetails();
+		$this->Set('section_form_details',$added_sample_details);
+		
+		$this->render('/element/rti_addmore_element/rti_addmore_element');
+		
+
+	}
+
+
+
+
+	// EDIT PACKER ID
+	// @AUTHOR : SHANKHPAL SHENDE
+	// DESC : created for Routine Inspection flow  (RTI)
+	// DATE : 28/12/2022 
+		
+	public function editPackId() {
+
+		$this->autoRender = false;
+		$this->loadModel('DmiRtiPackerDetails');
+		$this->loadModel('DmiAllTblsDetails');
+		
+
+		$customer_id = $this->Customfunctions->sessionCustomerID();
+
+		if ($this->Session->read('edit_pack_id')==null) {
+
+			$edit_pack_id = $_POST['edit_pack_id'];
+			
+			$this->Session->write('edit_pack_id',$edit_pack_id);
+
+		} elseif ($_POST['edit_pack_id'] != $this->Session->read('edit_pack_id')) {
+
+			if ($_POST['edit_pack_id'] == '') {
+				$save_packer_id = $_POST['save_packer_id'];
+			} else {
+				$edit_pack_id = $_POST['edit_pack_id'];
+				$this->Session->write('edit_pack_id',$edit_pack_id);
+			}
+		}
+
+		if ($this->Session->read('edit_pack_id') != null) {
+
+			if (!empty($edit_pack_id)) {
+
+				$find_packer_details = $this->DmiRtiPackerDetails->find('all',array('conditions'=>array('id IS'=>$edit_pack_id)))->first();
+
+				$packer_id = $find_packer_details['packer_id'];
+
+				$added_tbl_list = $this->DmiAllTblsDetails->find('list',array('keyField'=>'tbl_name','valueField'=>'tbl_name', 'conditions'=>array('customer_id IN'=>$packer_id)))->toArray();
+
+				$this->set('find_packer_details',$find_packer_details);
+				$this->set('added_tbl_list',$added_tbl_list);
+
+			}
+		}
+
+		if (!empty($save_packer_id)) {
+
+			$record_id = $this->Session->read('edit_pack_id');
+			
+			$packer_id = htmlentities($_POST['packer_id'], ENT_QUOTES);
+			$indent = htmlentities($_POST['indent'], ENT_QUOTES);
+			$supplied = htmlentities($_POST['supplied'], ENT_QUOTES);
+			$balance = htmlentities($_POST['balance'], ENT_QUOTES);
+			$tbl = htmlentities($_POST['tbl'], ENT_QUOTES);
+
+			$save_details_result = $this->DmiRtiPackerDetails->editPackerDetails($record_id,$packer_id,$indent,$supplied,$balance,$tbl);// call custome method from model
+			$this->Session->delete('edit_pack_id');
+		}
+
+		$added_packer_details = $this->DmiRtiPackerDetails->packagingDetails();
+
+		$this->Set('section_form_details',$added_packer_details);
+		
+		$this->render('/element/rti_addmore_element/rti_addmore_element_pp');
+		
+	}
+
+
+	
+	// delete Pack Id
+	// @AUTHOR : SHANKHPAL SHENDE
+	// DESC : created for Routine Inspection flow  (RTI)
+	// DATE : 28/12/2022 
+
+	public function deletePackId() {
+	
+		$this->Session->delete('edit_pack_id');
+		$this->loadModel('DmiRtiPackerDetails');
+		$customer_id = $this->Customfunctions->sessionCustomerID();
+		$record_id = $_POST['delete_pack_id'];
+		$packer_delete_result = $this->DmiRtiPackerDetails->deletePackDetails($record_id);// call to custome function from model
+		$added_packer_details = $this->DmiRtiPackerDetails->packagingDetails();
+		$this->Set('section_form_details',$added_packer_details);
+		
+		$this->render('/element/rti_addmore_element/rti_addmore_element_pp');
+
+	}
+
+
+
+	// GET Packer id wise tbl details
+	// @AUTHOR : SHANKHPAL SHENDE
+	// DESC : created for Routine Inspection flow  (RTI)
+	// DATE : 28/12/2022 
+
+	public function getPackerIdWiseTbl(){
+			
+		$this->autoRender = false;
+		
+		$packer_id = $_POST['packer_id'];
+		$this->loadModel('DmiFirms');
+		$this->loadModel('DmiAllTblsDetails');
+
+		// updated query by shankhpal shende on 19/05/2023
+		$tbl_list = $this->DmiAllTblsDetails->find('list',array('keyField'=>'tbl_code','valueField'=>'tbl_name', 'conditions'=>array('customer_id IN'=>$packer_id,'delete_status IS NULL')))->toList();
+
+		if(!empty($tbl_list)){
+			$result = array('tbl_name'=>$tbl_list);
+			echo '~'.json_encode($result).'~';
+		}else{
+			echo '~No data~';
+		}
+		exit;
+
+	}
+
 	/**
 	 * Function Created for  pending work that has remained 
 	 *	incomplete for more than 5 days. 

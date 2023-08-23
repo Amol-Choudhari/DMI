@@ -60,7 +60,8 @@ var split_cert_type = $('#split_cert_type').val();
 
 //added below new condition on 16-09-2019 for CA BEVO appln approved by Jtama only
 //updated condition on 23-01-2023 for PP as per new order of 10-01-2023
-if(check_user_role.ama == 'yes' || (check_user_role.jt_ama == 'yes' && (ca_bevo_applicant == 'yes' || split_cert_type==2) && application_type_id==1))//added cond. on 22-11-2021 for appl. type = 1
+//application_type==3 condition on 13-04-2023
+if(check_user_role.ama == 'yes' || (check_user_role.jt_ama == 'yes' && (ca_bevo_applicant == 'yes' || split_cert_type==2) && (application_type_id==1 || application_type_id==3)))//added cond. on 22-11-2021 for appl. type = 1
 {
     //below code added on 04-08-2017 by Amol
    $("#approved_btn").hide();

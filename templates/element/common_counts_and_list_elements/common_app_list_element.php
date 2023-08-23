@@ -134,6 +134,22 @@ $current_action = $this->request->getParam('action');
 						<?php }
 					
 					} ?>
+
+					<!--for level 3 and RO/SO user/ only for Routine Inspection (RTI) allocation 
+				   added by shankhpal shende on 08/12/2022 -->
+					<?php if($_SESSION['current_level']=='level_3'  && (!empty($each['alloc_sub_tab']) && $each['alloc_sub_tab']=='routine_inspection_allocation_tab' )){ 
+					
+						if($each['comm_with']=='Not Allocated'){ ?>
+							
+							<a id="allocate-routine-inspection<?php echo $i;?>" title="Allocate for Routine Inspection" class="allocate"><span class="glyphicon glyphicon-share-alt"></span></a>
+						
+						<?php }else{ ?>
+							
+							<a id="allocate-routine-inspection<?php echo $i;?>" title="Reallocate for Routine Inspection" class="reallocate"><span class="glyphicon glyphicon-share-alt"></span></a>
+						
+						<?php }
+					
+					} ?>
 					
 					
 					

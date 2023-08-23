@@ -82,6 +82,11 @@
 
 <input type="hidden" id="customer_flash_id" value="<?php echo $customer_id; ?>"/>
 
+<!-- below two hidden fields added on 28-07-2023 by Amol, to manage lab export appl. validity date on popup 
+	to show NABL accreditation validity date only -->
+<input type="hidden" id="valid_upto_date_id" value="<?php echo $valid_upto_date; ?>"/>
+<input type="hidden" id="export_unit_status_id" value="<?php echo $export_unit_status; ?>"/>
+
 <!-- to disable grant date filed if renewal date exist else highlight -->
 <?php  if (empty($old_app_renewal_dates)) { ?>
 	<?php echo $this->Html->css('element/old_app_renewal_dates'); ?>

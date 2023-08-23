@@ -9,12 +9,13 @@
       		foreach($allSectionDetails as $eachSection) {
 
       		  if(!empty($eachSection['progress_bar'])){
-					$show = 'no';
-					if($application_type == 3){
+					//updated on 13-04-2023 as per change updates							   
+					$show = 'yes';
+					/*if($application_type == 3){
 						if(in_array($eachSection['section_id'],$selectedSections)){
 							$show = 'yes';
 						}
-					 }else{  $show = 'yes';  }
+					 }else{  $show = 'yes';  }*/
 
 
 					 if( $show == 'yes'){

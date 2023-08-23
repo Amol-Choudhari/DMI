@@ -8,12 +8,15 @@ use App\Network\Email\Email;
 use App\Network\Request\Request;
 use App\Network\Response\Response;
 use Cake\ORM\TableRegistry;
+use Cake\Datasource\ConnectionManager;
 use tcpdf;
 use phpqrcode;
 use xmldsign;
 use Cake\Utility\Xml;
 use FR3D;
 use Cake\View;
+use PDF_Rotate;
+use MyCustomPDFWithWatermark;
 
 class ApplicationformspdfsController extends AppController{
 	
@@ -21,9 +24,10 @@ class ApplicationformspdfsController extends AppController{
 							
     public function initialize(): void
     {	
-		ini_set('max_execution_time', 300);//added on 24-04-2023 to increase execution time
-        parent::initialize();
-		   
+		ini_set('max_execution_time', 300);
+       
+		parent::initialize();
+
 		$this->loadComponent('Customfunctions');
 		$this->loadComponent('Mastertablecontent');
 		$this->viewBuilder()->setHelpers(['Form','Html']);
@@ -94,10 +98,23 @@ class ApplicationformspdfsController extends AppController{
 			$pdfPrefix = 'EC-';
 		}elseif($application_type==8){ //added by shankhpal shende on 15-11-2022
 			$pdfPrefix = 'ADP-';
-		}
+		}elseif($application_type==3){ //added by Amol 13-04-2023 for change/modification
+			$pdfPrefix = 'MOD-';
+		}elseif ($application_type==9) { #For Surrender Application - Akash [14-04-2023]
+			$pdfPrefix = 'SOC-';
+		}//added condtion for chemist to name of pdf start like CHM by laxmi B. on 15-12-22
+        elseif($application_type==4){
+			   
+																				  
+			$pdfPrefix = 'CHM-';
+		}																		 
+		 //added if else for chemist application use rearranged id given format added by laxmi B. on 15-12-2022
+         if($_SESSION['application_type']==4){
+    	  $rearranged_id = $pdfPrefix.$split_customer_id[0].'-'.$split_customer_id[1].'-'.$split_customer_id[2];
+         }else{
 
-	
-		$rearranged_id = $pdfPrefix.$split_customer_id[0].'-'.$split_customer_id[1].'-'.$split_customer_id[2].'-'.$split_customer_id[3];				
+         	$rearranged_id = $pdfPrefix.$split_customer_id[0].'-'.$split_customer_id[1].'-'.$split_customer_id[2].'-'.$split_customer_id[3];	
+         }	
 	
 		//check applicant last record version to increment		
 		$list_id = $Dmi_app_pdf_record->find('list', array('valueField'=>'id', 'conditions'=>array('customer_id IS'=>$customer_id)))->toArray();
@@ -117,8 +134,8 @@ class ApplicationformspdfsController extends AppController{
 		$this->Session->write('pdf_file_name',$rearranged_id.'('.$current_pdf_version.')'.'.pdf');
 	
 		//condition to check if application is old or new
-		
-		if($this->Customfunctions->checkApplicationOldNew($customer_id)=='new' || $application_type !=1){
+		// chenged condtion and ANDing application type not 4 to not save chemist pdf in given way added by laxmi B. on 15-12-2022
+		if(($this->Customfunctions->checkApplicationOldNew($customer_id)=='new' || $application_type !=1) && ( $application_type !=4)){
 			
 			//creating filename and file path to save				
 			$file_path = '/writereaddata/DMI/temp/'.$rearranged_id.'('.$current_pdf_version.')'.'.pdf';
@@ -201,7 +218,11 @@ class ApplicationformspdfsController extends AppController{
 			$file_path = '/writereaddata/DMI/applications/'.$folderName.'/'.$rearranged_id.'('.$current_pdf_version.')'.'.pdf';				
 			$filename = $_SERVER["DOCUMENT_ROOT"].$file_path;
 			$this->callTcpdf($all_data_pdf,'F',$customer_id,'old');//on 23-01-2020 with save mode
-			
+			//to preview in chemistApplication  pdf added by laxmi on 15-12-2022
+			  if($_SESSION['application_type'] == 4){
+               $this->callTcpdf($all_data_pdf,'I',$customer_id,'old');
+			   } 
+			   
 			$Dmi_app_pdf_record_entity = $Dmi_app_pdf_record->newEntity(array(
 					
 				'customer_id'=>$customer_id,
@@ -213,7 +234,11 @@ class ApplicationformspdfsController extends AppController{
 			
 			));
 			$Dmi_app_pdf_record->save($Dmi_app_pdf_record_entity);
-			
+			//to redirect in chemist dashbord added by laxmi on 15-12-2022
+			  if($_SESSION['application_type'] == 4){
+                $this->redirect('/chemist/home');
+			   } 
+
 			$this->redirect('/customers/secondary-home');
 		}
 	
@@ -226,8 +251,7 @@ class ApplicationformspdfsController extends AppController{
 		//if present then remove that record, delete file from temp folder, and update record from main esign status table
 		//added on 02-10-2018 by Amol
 		$Dmi_temp_esign_status = TableRegistry::getTableLocator()->get('DmiTempEsignStatuses');
-		$Dmi_temp_esign_status->checkTempEsignRecordExist($this->Session->read('customer_id'),$this->Session->read('current_level'));																															 
-		
+		$Dmi_temp_esign_status->checkTempEsignRecordExist($this->Session->read('customer_id'),$this->Session->read('current_level'));
 		$application_type = $this->Session->read('application_type');
 		$Dmi_flow_wise_tables_list = TableRegistry::getTableLocator()->get('DmiFlowWiseTablesLists');
 		$Dmi_final_submit_tb = $Dmi_flow_wise_tables_list->find('all',array('conditions'=>array('application_type IS'=>$application_type)))->first();
@@ -253,6 +277,11 @@ class ApplicationformspdfsController extends AppController{
 		
 		}elseif($application_type==8){ //added by shankhpal shende on 15-11-2022
 			$pdfPrefix = 'ADP-';
+		}elseif($application_type==3){ #For Change Module 
+			$pdfPrefix = 'MOD-';
+		
+		}elseif($application_type==10){ //For Routine Inspection Module (RTI)
+			$pdfPrefix = 'RTI-';
 		}
 		
 		$rearranged_id = 'I-'.$pdfPrefix.$split_customer_id[0].'-'.$split_customer_id[1].'-'.$split_customer_id[2].'-'.$split_customer_id[3];
@@ -356,10 +385,19 @@ class ApplicationformspdfsController extends AppController{
 		
 		}elseif($application_type==8){ //added by shankhpal shende on 15-11-2022
 			$pdfPrefix = 'ADP-';
+		}elseif($application_type==3){ //added by Amol 13-04-2023 for change/modification
+			$pdfPrefix = 'MOD-';
+		}elseif($application_type==9){ #For Surrender Application -Akash [14-04-2023]
+			$pdfPrefix = 'SOC-';
 		}
 		
+		//for chemist id  generate new id for grant pdf save added below condition by  laxmi on 03-01-2023
+		if($application_type == 4){
+         $rearranged_id = 'G-'.$pdfPrefix.$split_customer_id[0].'-'.$split_customer_id[1].'-'.$split_customer_id[2];
+		}else{
 		$rearranged_id = 'G-'.$pdfPrefix.$split_customer_id[0].'-'.$split_customer_id[1].'-'.$split_customer_id[2].'-'.$split_customer_id[3];
-				
+		}	
+		
 		//check applicant last record version to increment				
 		$list_id = $Dmi_grant_pdf_record->find('list', array('valueField'=>'id', 'conditions'=>array('customer_id IS'=>$customer_id)))->toArray();
 					
@@ -382,7 +420,8 @@ class ApplicationformspdfsController extends AppController{
 		
 		//to set default pdf version 1 for old verified appl cert esign.
 		//added on 21-06-2023 by Amol
-		if($_SESSION['gen_old_cert_session']=='yes'){
+		//also added !empty cond. on 14-08-2023 by Amol
+		if(!empty($_SESSION['gen_old_cert_session']) && $_SESSION['gen_old_cert_session']=='yes'){
 			$current_pdf_version = 1;
 		}
 		
@@ -414,10 +453,17 @@ class ApplicationformspdfsController extends AppController{
 				
 				//changed file path from temp to files
 				$file_path = '/writereaddata/DMI/certificates/'.$folderName.'/'.$rearranged_id.'('.$current_pdf_version.')'.'.pdf';						
+				//to updated the changed fields in main table, and save log for the same.
+				//added on 23-05-2023 by Amol
+				if($application_type==3){
+					
+					$this->loadModel('DmiChangeApplDetails');
+					$this->DmiChangeApplDetails->updateChangeDetailsAftergrant($customer_id);
+				}
 				
 				//added condition to save logs for old appl cert esign in logs table
 				//on 20-06-2023 by Amol
-				if($_SESSION['gen_old_cert_session']=='yes'){
+				if(!empty($_SESSION['gen_old_cert_session']) && $_SESSION['gen_old_cert_session']=='yes'){
 					
 					$DmiOldApplEsignCertLogs = TableRegistry::getTableLocator()->get('DmiOldApplEsignCertLogs');
 					
@@ -425,7 +471,7 @@ class ApplicationformspdfsController extends AppController{
 						'customer_id'=>$customer_id,
 						'user_email_id'=>$user_email_id,
 						'pdf_file'=>$file_path,
-						'pdf_version'=>'1',//default version 1 as old is first grant
+						'pdf_version'=>$current_pdf_version,//default version 1 as old is first grant
 						'appl_type'=>$application_type,
 						'created'=>date('Y-m-d H:i:s'),
 						'modified'=>date('Y-m-d H:i:s')				
@@ -448,6 +494,7 @@ class ApplicationformspdfsController extends AppController{
 					));
 					$Dmi_grant_pdf_record->save($grantPdfRecords);
 				}
+				
 				
 			}else{
 			
@@ -529,9 +576,22 @@ class ApplicationformspdfsController extends AppController{
 		$Dmi_esign_status = TableRegistry::getTableLocator()->get($esign_status);
 		
 		$all_data_pdf = $this->render($pdf_view_path);		
-	
-		$rearranged_id = 'G-'.$split_customer_id[0].'-'.$split_customer_id[1].'-'.$split_customer_id[2].'-'.$split_customer_id[3];
 		
+		//Below Block Is added to Change the PDF prefix if the Firm is Suspended or Cancelled- Akash [02-06-2023]
+		if ($this->Session->check('for_module')) {
+
+			$for_module = $this->Session->read('for_module');
+			
+			if ($for_module === 'Suspension') {
+				$rearranged_id = 'SPN-'.$split_customer_id[0].'-'.$split_customer_id[1].'-'.$split_customer_id[2].'-'.$split_customer_id[3];
+			} elseif ($for_module === 'Cancellation') {
+				$rearranged_id = 'CAN-'.$split_customer_id[0].'-'.$split_customer_id[1].'-'.$split_customer_id[2].'-'.$split_customer_id[3];
+			} 
+
+		} else {
+			$rearranged_id = 'G-'.$split_customer_id[0].'-'.$split_customer_id[1].'-'.$split_customer_id[2].'-'.$split_customer_id[3];
+		}
+
 		//updated logic as per new order on 01-04-2021, 5 years validity for PP and Laboratory
 		//as the module is to reesign renewal certificate only, So now need to re-esign the first grant also, if granted with 2 years of validity
 		//but not the old first grant record
@@ -859,7 +919,7 @@ class ApplicationformspdfsController extends AppController{
 		/*--Code end by pravin 18/3/2017--*/
 		
 		
-	// to show firm address name form id
+		// to show firm address name form id
 	
 		$fetch_district_name = $this->DmiDistricts->find('all',array('fields'=>'district_name','conditions'=>array('id IS'=>$customer_firm_data['district'])))->first();
 		$firm_district_name = $fetch_district_name['district_name'];
@@ -1550,6 +1610,7 @@ class ApplicationformspdfsController extends AppController{
 		$this->loadModel('DmiAllDirectorsDetails');
 		$this->loadModel('DmiRenewalFinalSubmits');
 		$this->loadModel('DmiCustomerLaboratoryDetails');
+		$this->loadModel('DmiSurrenderFinalSubmits');
 		
 		$customer_id = $this->Session->read('customer_id');
 		$this->set('customer_id',$customer_id);
@@ -1591,26 +1652,26 @@ class ApplicationformspdfsController extends AppController{
 		foreach($sub_commodity_array as $sub_commodity_id)
 		{			
 			$fetch_commodity_id = $this->MCommodity->find('all',array('conditions'=>array('commodity_code IS'=>$sub_commodity_id)))->first();
-			$commodity_id[$i] = $fetch_commodity_id['category_code'];			
-			$sub_commodity_data[$i] =  $fetch_commodity_id;			
+			$commodity_id[$i] = $fetch_commodity_id['category_code'];
+			$sub_commodity_data[$i] =  $fetch_commodity_id;
 			$i=$i+1;
 		}
 
-		$unique_commodity_id = array_unique($commodity_id);		
+		$unique_commodity_id = array_unique($commodity_id);
 		$commodity_name_list = $this->MCommodityCategory->find('all',array('conditions'=>array('category_code IN'=>$unique_commodity_id, 'display'=>'Y')))->toArray();
-		$this->set('commodity_name_list',$commodity_name_list);		
+		$this->set('commodity_name_list',$commodity_name_list);
 		$this->set('sub_commodity_data',$sub_commodity_data);
 
 		$firm_data = $this->DmiCustomerFirmProfiles->sectionFormDetails($customer_id);
 		$this->set('firm_data',$firm_data);
 		
 		$business_type = $this->Mastertablecontent->businessTypeById($firm_data[0]['business_type']);	
-		$this->set('business_type',$business_type);				
+		$this->set('business_type',$business_type);
 		
 		$premises_data = $this->DmiCustomerPremisesProfiles->sectionFormDetails($customer_id);
 		$this->set('premises_data',$premises_data);
 		
-		// to show premises address name form id		
+		// to show premises address name form id
 		if($ca_bevo_applicant == 'no')
 		{
 			$premises_district_name = $this->Mastertablecontent->districtValueById($premises_data[0]['district']);
@@ -1642,6 +1703,20 @@ class ApplicationformspdfsController extends AppController{
 		$added_directors_details = $this->DmiAllDirectorsDetails->allDirectorsDetail($customer_id);		
 		$this->set('added_directors_details',$added_directors_details);
 
+		//check if process is Change/Modification then get details from change table.
+		//because main tables will be updated with new details at last once certificate esigned.
+		//added on 13-04-2023 for change management
+		$this->loadModel('DmiChangeSelectedFields');
+		$getNoOfAppl = $this->DmiChangeSelectedFields->find('all',array('fields'=>array('id','changefields'),'conditions'=>array('customer_id IS'=>$customer_id),'order'=>'id desc'))->toArray();
+		if ($this->Session->read('application_type')==3 || !empty($getNoOfAppl)) {
+			$this->loadComponent('Randomfunctions');
+			$this->Randomfunctions->setChangedDetailsForGrantPdf($customer_id,$customer_firm_data,$premises_data,$laboratory_data,$business_type);
+			
+			$this->Randomfunctions->showChangedFieldsInGrantPdfSection($customer_id,$getNoOfAppl);
+			
+			$this->set('getNoOfAppl',$getNoOfAppl);
+		}
+
 		//if called for re-esign process, make grant date condition blank, bcoz need to call all records
 		//applied on 24-09-2021 by Amol
 		if($this->Session->read('re_esigning')=='yes' && 
@@ -1649,7 +1724,7 @@ class ApplicationformspdfsController extends AppController{
 			$grantDateCondition = '';
 		}
 		
-		//for renewal update in Printing grant certificate_type																															//this condition commented on 10-11-2017 by Amol, to show renewal details in grant preview.			
+		//for renewal update in Printing grant certificate_type //this condition commented on 10-11-2017 by Amol, to show renewal details in grant preview.			
 		$check_renewal_final_submit = $this->DmiRenewalFinalSubmits->find('all',array('conditions'=>array('customer_id IS'=>$customer_id, /*$grantDateCondition 'status'=>'approved', 'current_level'=>'level_1'*/)))->first();
 		$this->set('check_renewal_final_submit',$check_renewal_final_submit);
 		
@@ -1696,19 +1771,23 @@ class ApplicationformspdfsController extends AppController{
 				$lastGrantDate = $each_grant['date'];//added on 14-10-2021
 			}
 			
-			//to show current on going renewal details at last
-			$get_user_details = $this->DmiUsers->find('all',array('conditions'=>array('email IS'=>$this->Session->read('username'))))->first();
-			$user_full_name[$i] = $get_user_details['f_name'].' '.$get_user_details['l_name'];
+			//this if statement added on 13-04-2023, to renewal dates on change appl grant. not to show current on going renewal details at last
+			if ($this->Session->read('application_type')!=3){ 
 			
-			$cert_grant_date = $pdf_date;
-			
-			//added new condition to get last grant date for genration cert. for old appl.
-			//on 20-06-2023 by Amol
-			if($_SESSION['gen_old_cert_session']=='yes'){
-				$cert_grant_date = $lastGrantDate;
-				$pdf_date = substr($lastGrantDate,0,10);//to crop 00:00:00
+				//to show current on going renewal details at last
+				$get_user_details = $this->DmiUsers->find('all',array('conditions'=>array('email IS'=>$this->Session->read('username'))))->first();
+				$user_full_name[$i] = $get_user_details['f_name'].' '.$get_user_details['l_name'];
+				
+				$cert_grant_date = $pdf_date;
+				
+				//added new condition to get last grant date for genration cert. for old appl.
+				//on 20-06-2023 by Amol
+				if(!empty($_SESSION['gen_old_cert_session']) && $_SESSION['gen_old_cert_session']=='yes'){
+					$cert_grant_date = $lastGrantDate;
+					$pdf_date = substr($lastGrantDate,0,10);//to crop 00:00:00
+				}
+				$certificate_valid_upto[$i] = $this->Customfunctions->getCertificateValidUptoDate($customer_id,$cert_grant_date);
 			}
-			$certificate_valid_upto[$i] = $this->Customfunctions->getCertificateValidUptoDate($customer_id,$cert_grant_date);
 			
 			
 		}else{				
@@ -1724,11 +1803,23 @@ class ApplicationformspdfsController extends AppController{
 		$this->set('get_grant_details',$get_grant_details);
 		$this->set('user_full_name',$user_full_name);
 		$this->set('certificate_valid_upto',$certificate_valid_upto);
+
+		//This is added to check the URL without the passed values for Suspension / Cancellation Module - Akash [01-06-2023]
+		$url = $this->request->referer();
+		$parsedUrl = parse_url($url);
+		if (isset($parsedUrl['path'])) {
+			$path = $parsedUrl['path'];
+		} 
 		
 		//added this condition on 08-06-2019 by Amol
 		//to proceed for re esigning renewal grant if session is set and check previous URL
 		if($this->Session->read('re_esigning')=='yes' && 
-			($this->request->referer('/',true)=='/othermodules/re_esign_module' || $this->request->referer('/',true)=='/othermodules/update-firm-details')){//updated new condition on 24-12-2021 by Amol, re-esign for firm details updates
+			(
+				$this->request->referer('/',true)=='/othermodules/re_esign_module' || 
+				$this->request->referer('/',true)=='/othermodules/update-firm-details' ||
+				$path //=> This is added for Suspension / Cancellation PDF changes. - Akash [01-06-2023]
+		
+			)){//updated new condition on 24-12-2021 by Amol, re-esign for firm details updates
 			
 			//added below code and conditions on 08-01-2021 by Amol
 			$user_full_name = array();
@@ -1765,13 +1856,42 @@ class ApplicationformspdfsController extends AppController{
 			$this->set('certificate_valid_upto',$certificate_valid_upto);
 
 			//This below line is added for the QR Code genration on Shankhpal [16-08-2022]	
-			$firm_name_forqr = $firm_data[0]['firm_name'];	
+			$firm_name_forqr = $customer_firm_data['firm_name'];//updated on 25-04-2023, to get updated details, if changed appl in process
 			$data = [$customer_id,$pdf_date,$certificate_valid_upto,$firm_name_forqr];
-			$result_for_qr = $this->Customfunctions->getQrCode($data);
-			$this->set('result_for_qr',$result_for_qr);
+			
+			
+			if ($_SESSION['application_type'] == '9') {	 		//For Surrender [Application Type = 9] - (SOC) -> Akash [02-05-2023]
+				$result_for_qr = $this->Customfunctions->getQrCode($data,'SOC');
 
+			} elseif ($this->Session->check('for_module')) {
+
+				if($this->Session->read('for_module') == 'Suspension') {
+					$result_for_qr = $this->Customfunctions->getQrCode($data,'SPN'); //For Suspension [Application Type = 9] - (SPN) -> Akash [06-06-2023]
+				} elseif ($this->Session->read('for_module') == 'Cancellation') {
+					$result_for_qr = $this->Customfunctions->getQrCode($data,'CAN'); //For Suspension [Application Type = 9] - (CAN) -> Akash [06-06-2023]
+				}
+			
+			} else {
+				$result_for_qr = $this->Customfunctions->getQrCode($data);
+			}
+			
+			$this->set('result_for_qr',$result_for_qr);
+			
+			#To check if the application is for Surrender Flow - Akash [14-04-2023]
+			$isSurrender = $this->DmiSurrenderFinalSubmits->checkIfSurrender($customer_id);
+			$this->set('isSurrender',$isSurrender);
+
+			//Add for the surrender approved by name - Akash [17-08-2023]
+			if ($_SESSION['application_type'] == '9') {
+				$surrender_approved_by = $this->DmiUsers->getFullName($this->Session->read('username'));
+				$this->set('surrender_approved_by',$surrender_approved_by);
+			}
+
+			//To give the commodities 
+			$commodityNames = $this->Customfunctions->commodityNames($customer_id);
+			$this->set('commodityNames',$commodityNames);
+			
 			$this->generateGrantCerticateToReEsignPdf('/Applicationformspdfs/grantCaCertificatePdf'); 
-			//$this->create_grant_certificate_pdf_to_re_esign();
 			
 		}else{
 
@@ -1795,11 +1915,40 @@ class ApplicationformspdfsController extends AppController{
 			}
 			
 			//This below line is added for the QR Code genration on Shankhpal [16-08-2022]	
-			$firm_name_forqr = $firm_data[0]['firm_name'];	
+			$firm_name_forqr = $customer_firm_data['firm_name'];//updated on 25-04-2023, to get updated details, if changed appl in process
 			$data = [$customer_id,$pdf_date,$certificate_valid_upto,$firm_name_forqr];
-			$result_for_qr = $this->Customfunctions->getQrCode($data);
+
+			if ($_SESSION['application_type'] == '9') {	 		//For Surrender [Application Type = 9] - (SOC) -> Akash [02-05-2023]
+				$result_for_qr = $this->Customfunctions->getQrCode($data,'SOC');
+
+			} elseif ($this->Session->check('for_module')) {
+
+				if($this->Session->read('for_module') == 'Suspension') {
+					$result_for_qr = $this->Customfunctions->getQrCode($data,'SPN'); //For Suspension [Application Type = 9] - (SPN) -> Akash [06-06-2023]
+				} elseif ($this->Session->read('for_module') == 'Cancellation') {
+					$result_for_qr = $this->Customfunctions->getQrCode($data,'CAN'); //For Suspension [Application Type = 9] - (CAN) -> Akash [06-06-2023]
+				}
+			
+			} else {
+				$result_for_qr = $this->Customfunctions->getQrCode($data);
+			}
+			
 			$this->set('result_for_qr',$result_for_qr);
 			
+			#To check if the application is for Surrender Flow - Akash [14-04-2023]
+			$isSurrender = $this->DmiSurrenderFinalSubmits->checkIfSurrender($customer_id);
+			$this->set('isSurrender',$isSurrender);
+
+			//Add for the surrender approved by name - Akash [17-08-2023]
+			if ($_SESSION['application_type'] == '9') {
+				$surrender_approved_by = $this->DmiUsers->getFullName($this->Session->read('username'));
+				$this->set('surrender_approved_by',$surrender_approved_by);
+			}
+
+			//To give the commodities 
+			$commodityNames = $this->Customfunctions->commodityNames($customer_id);
+			$this->set('commodityNames',$commodityNames);
+
 			$this->generateGrantCerticatePdf('/Applicationformspdfs/grantCaCertificatePdf'); 
 					
 		}
@@ -1818,6 +1967,7 @@ class ApplicationformspdfsController extends AppController{
 		$this->loadModel('DmiPrintingFirmProfiles');
 		$this->loadModel('DmiAllDirectorsDetails');
 		$this->loadModel('DmiRenewalFinalSubmits');
+		$this->loadModel('DmiSurrenderFinalSubmits');
 		
 		$customer_id = $this->Session->read('customer_id');
 		$this->set('customer_id',$customer_id);
@@ -1828,6 +1978,11 @@ class ApplicationformspdfsController extends AppController{
 		// Fetch grant date conditions get latest records.
 		$grantDateCondition = $this->Customfunctions->returnGrantDateCondition($customer_id);
 		
+		#To check if the application is for Surrender Flow - Akash [14-04-2023]
+		$isSurrender = $this->DmiSurrenderFinalSubmits->checkIfSurrender($customer_id);
+		$this->set('isSurrender',$isSurrender);
+
+
 		// Fetch data from DMI firm Table					
 		$customer_firm_data = $this->DmiFirms->firmDetails($customer_id);	
 		$this->set('customer_firm_data',$customer_firm_data);
@@ -1871,6 +2026,21 @@ class ApplicationformspdfsController extends AppController{
 		// show added directors table	
 		$added_directors_details = $this->DmiAllDirectorsDetails->allDirectorsDetail($customer_id);	
 		$this->set('added_directors_details',$added_directors_details);
+
+		//check if process is Change/Modification then get details from change table.
+		//because main tables will be updated with new details at last once certificate esigned.
+		//added on 13-04-2023 for change management
+		$this->loadModel('DmiChangeSelectedFields');
+		$getNoOfAppl = $this->DmiChangeSelectedFields->find('all',array('fields'=>array('id','changefields'),'conditions'=>array('customer_id IS'=>$customer_id),'order'=>'id desc'))->toArray();
+			
+		if ($this->Session->read('application_type')==3 || !empty($getNoOfAppl)) {
+			$this->loadComponent('Randomfunctions');
+			$this->Randomfunctions->setChangedDetailsForGrantPdf($customer_id,$customer_firm_data,$premises_data,null,$business_type);
+			
+			$this->Randomfunctions->showChangedFieldsInGrantPdfSection($customer_id,$getNoOfAppl);
+			
+			$this->set('getNoOfAppl',$getNoOfAppl);
+		}
 
 		//if called for re-esign process, make grant date condition blank, bcoz need to call all records
 		//applied on 24-09-2021 by Amol
@@ -1928,20 +2098,24 @@ class ApplicationformspdfsController extends AppController{
 				$lastGrantDate = $each_grant['date'];//added on 14-10-2021
 			}
 			
-			//to show current on going renewal details at last
-			$get_user_details = $this->DmiUsers->find('all',array('conditions'=>array('email IS'=>$this->Session->read('username'))))->first();
-			$user_full_name[$i] = $get_user_details['f_name'].' '.$get_user_details['l_name'];
+			//this if statement added on 13-04-2023, to renewal dates on change appl grant. not to show current on going renewal details at last
+			if ($this->Session->read('application_type')!=3){ 
 			
-			$cert_grant_date = $pdf_date;
+				//to show current on going renewal details at last
+				$get_user_details = $this->DmiUsers->find('all',array('conditions'=>array('email IS'=>$this->Session->read('username'))))->first();
+				$user_full_name[$i] = $get_user_details['f_name'].' '.$get_user_details['l_name'];
+				
+				$cert_grant_date = $pdf_date;
+				
+				//added new condition to get last grant date for genration cert. for old appl.
+				//on 20-06-2023 by Amol
+				if(!empty($_SESSION['gen_old_cert_session']) && $_SESSION['gen_old_cert_session']=='yes'){
+					$cert_grant_date = $lastGrantDate;
+					$pdf_date = substr($lastGrantDate,0,10);//to crop 00:00:00
+				}
 			
-			//added new condition to get last grant date for genration cert. for old appl.
-			//on 20-06-2023 by Amol
-			if($_SESSION['gen_old_cert_session']=='yes'){
-				$cert_grant_date = $lastGrantDate;
-				$pdf_date = substr($lastGrantDate,0,10);//to crop 00:00:00
+				$certificate_valid_upto[$i] = $this->Customfunctions->getCertificateValidUptoDate($customer_id,$cert_grant_date);
 			}
-			
-			$certificate_valid_upto[$i] = $this->Customfunctions->getCertificateValidUptoDate($customer_id,$cert_grant_date);
 			
 			
 		}else{				
@@ -1988,6 +2162,7 @@ class ApplicationformspdfsController extends AppController{
 				}
 			}
 			
+
 			$this->set('pdf_date',$this->Session->read('re_esign_grant_date'));
 			//providing existing grant date in function to get correct validity date
 			//$i-1 is used because it is for re-esign, no need to create new record, get last record
@@ -1995,13 +2170,27 @@ class ApplicationformspdfsController extends AppController{
 			
 			//added below lines on 08-01-2021 by Amol
 			$this->set('get_grant_details',$get_grant_details);
-			$this->set('user_full_name',$user_full_name);
+			$this->set('user_full_name',$user_full_name); 
 			$this->set('certificate_valid_upto',$certificate_valid_upto);
 			
 			//This below line is added for the QR Code genration on Shankhpal [16-08-2022]	
-			$firm_name_forqr = $firm_data[0]['firm_name'];	
+			$firm_name_forqr = $customer_firm_data['firm_name'];//updated on 25-04-2023, to get updated details, if changed appl in process	
 			$data = [$customer_id,$pdf_date,$certificate_valid_upto,$firm_name_forqr];
-			$result_for_qr = $this->Customfunctions->getQrCode($data);
+
+
+			//this condition is updated for the surrender application - Akash [11-05-2023]
+			if ($_SESSION['application_type'] == '9') {
+				$result_for_qr = $this->Customfunctions->getQrCode($data,'SOC');
+			} else {
+				$result_for_qr = $this->Customfunctions->getQrCode($data);
+			}
+
+			//Add for the surrender approved by name - Akash [17-08-2023]
+			if ($_SESSION['application_type'] == '9') {
+				$surrender_approved_by = $this->DmiUsers->getFullName($this->Session->read('username'));
+				$this->set('surrender_approved_by',$surrender_approved_by);
+			}
+
 			$this->set('result_for_qr',$result_for_qr);				
 
 			$this->generateGrantCerticateToReEsignPdf('/Applicationformspdfs/grantPrintingCertificatePdf'); 
@@ -2027,12 +2216,26 @@ class ApplicationformspdfsController extends AppController{
 				$this->set('user_full_name',$user_full_name);																						   
 				$this->set('certificate_valid_upto',$certificate_valid_upto);
 			}
-
+			
 			//This below line is added for the QR Code genration on Shankhpal [16-08-2022]	
-			$firm_name_forqr = $firm_data[0]['firm_name'];	
+			$firm_name_forqr = $customer_firm_data['firm_name'];//updated on 25-04-2023, to get updated details, if changed appl in process
 			$data = [$customer_id,$pdf_date,$certificate_valid_upto,$firm_name_forqr];
-			$result_for_qr = $this->Customfunctions->getQrCode($data);
-			$this->set('result_for_qr',$result_for_qr);				
+
+			//this condition is updated for the surrender application - Akash [11-05-2023]
+			if ($_SESSION['application_type'] == '9') {
+				$result_for_qr = $this->Customfunctions->getQrCode($data,'SOC');
+			} else {
+				$result_for_qr = $this->Customfunctions->getQrCode($data);
+			}
+
+			$this->set('result_for_qr',$result_for_qr);
+
+			//Add for the surrender approved by name - Akash [17-08-2023]
+			if ($_SESSION['application_type'] == '9') {
+				$surrender_approved_by = $this->DmiUsers->getFullName($this->Session->read('username'));
+				$this->set('surrender_approved_by',$surrender_approved_by);
+			}
+			
 			
 			$this->generateGrantCerticatePdf('/Applicationformspdfs/grantPrintingCertificatePdf'); 
 						
@@ -2051,6 +2254,7 @@ class ApplicationformspdfsController extends AppController{
 		$this->loadModel('DmiLaboratoryFirmDetails');
 		$this->loadModel('DmiAllDirectorsDetails');
 		$this->loadModel('DmiRenewalFinalSubmits');
+		$this->loadModel('DmiSurrenderFinalSubmits');
 				
 		//Apply check " customer_id available status " (Done By pravin 27/10/2017)
 		$customer_id = $this->Session->read('customer_id');
@@ -2061,7 +2265,11 @@ class ApplicationformspdfsController extends AppController{
 		
 		// Fetch grant date conditions get latest records.
 		$grantDateCondition = $this->Customfunctions->returnGrantDateCondition($customer_id);
-			
+		
+		#To check if the application is for Surrender Flow - Akash [14-04-2023]
+		$isSurrender = $this->DmiSurrenderFinalSubmits->checkIfSurrender($customer_id);
+		$this->set('isSurrender',$isSurrender);
+
 		$pdf_date = date('d-m-Y');
 		$this->set('pdf_date',$pdf_date);	
 		
@@ -2117,6 +2325,20 @@ class ApplicationformspdfsController extends AppController{
 		//Fetch added directors table details
 		$added_directors_details = $this->DmiAllDirectorsDetails->allDirectorsDetail($customer_id);	
 		$this->set('added_directors_details',$added_directors_details);
+
+		//check if process is Change/Modification then get details from change table.
+		//because main tables will be updated with new details at last once certificate esigned.
+		//added on 13-04-2023 for change management
+		$this->loadModel('DmiChangeSelectedFields');
+		$getNoOfAppl = $this->DmiChangeSelectedFields->find('all',array('fields'=>array('id','changefields'),'conditions'=>array('customer_id IS'=>$customer_id),'order'=>'id desc'))->toArray();
+		if ($this->Session->read('application_type')==3 || !empty($getNoOfAppl)) {
+			$this->loadComponent('Randomfunctions');
+			$this->Randomfunctions->setChangedDetailsForGrantPdf($customer_id,$customer_firm_data,null,null,$business_type);
+			
+			$this->Randomfunctions->showChangedFieldsInGrantPdfSection($customer_id,$getNoOfAppl);
+			
+			$this->set('getNoOfAppl',$getNoOfAppl);
+		}
 
 		//if called for re-esign process, make grant date condition blank, bcoz need to call all records
 		//applied on 24-09-2021 by Amol
@@ -2174,20 +2396,24 @@ class ApplicationformspdfsController extends AppController{
 				$lastGrantDate = $each_grant['date'];//added on 14-10-2021
 			}
 			
-			//to show current on going renewal details at last
-			$get_user_details = $this->DmiUsers->find('all',array('conditions'=>array('email IS'=>$this->Session->read('username'))))->first();
-			$user_full_name[$i] = $get_user_details['f_name'].' '.$get_user_details['l_name'];
+			//this if statement added on 13-04-2023, to renewal dates on change appl grant. not to show current on going renewal details at last
+			if ($this->Session->read('application_type')!=3){ 
 			
-			$cert_grant_date = $pdf_date;
+				//to show current on going renewal details at last
+				$get_user_details = $this->DmiUsers->find('all',array('conditions'=>array('email IS'=>$this->Session->read('username'))))->first();
+				$user_full_name[$i] = $get_user_details['f_name'].' '.$get_user_details['l_name'];
+				
+				$cert_grant_date = $pdf_date;
+				
+				//added new condition to get last grant date for genration cert. for old appl.
+				//on 20-06-2023 by Amol
+				if(!empty($_SESSION['gen_old_cert_session']) && $_SESSION['gen_old_cert_session']=='yes'){
+					$cert_grant_date = $lastGrantDate;
+					$pdf_date = substr($lastGrantDate,0,10);//to crop 00:00:00
+				}
 			
-			//added new condition to get last grant date for genration cert. for old appl.
-			//on 20-06-2023 by Amol
-			if($_SESSION['gen_old_cert_session']=='yes'){
-				$cert_grant_date = $lastGrantDate;
-				$pdf_date = substr($lastGrantDate,0,10);//to crop 00:00:00
+				$certificate_valid_upto[$i] = $this->Customfunctions->getCertificateValidUptoDate($customer_id,$cert_grant_date);
 			}
-			
-			$certificate_valid_upto[$i] = $this->Customfunctions->getCertificateValidUptoDate($customer_id,$cert_grant_date);
 			
 			
 		}else{				
@@ -2245,9 +2471,22 @@ class ApplicationformspdfsController extends AppController{
 			$this->set('certificate_valid_upto',$certificate_valid_upto);
 
 			//This below line is added for the QR Code genration on Shankhpal [16-08-2022]	
-			$firm_name_forqr = $customer_firm_data['firm_name'];
+			$firm_name_forqr = $customer_firm_data['firm_name'];//updated on 25-04-2023, to get updated details, if changed appl in process
 			$data = [$customer_id,$pdf_date,$certificate_valid_upto,$firm_name_forqr];
-			$result_for_qr = $this->Customfunctions->getQrCode($data);
+
+			//this condition is updated for the surrender application - Akash [11-05-2023]
+			if ($_SESSION['application_type'] == '9') {
+				$result_for_qr = $this->Customfunctions->getQrCode($data,'SOC');
+			} else {
+				$result_for_qr = $this->Customfunctions->getQrCode($data);
+			}
+
+			//Add for the surrender approved by name - Akash [17-08-2023]
+			if ($_SESSION['application_type'] == '9') {
+				$surrender_approved_by = $this->DmiUsers->getFullName($this->Session->read('username'));
+				$this->set('surrender_approved_by',$surrender_approved_by);
+			}
+
 			$this->set('result_for_qr',$result_for_qr);
 
 			$this->generateGrantCerticateToReEsignPdf('/Applicationformspdfs/grantLaboratoryCertificatePdf'); 
@@ -2274,10 +2513,23 @@ class ApplicationformspdfsController extends AppController{
 			}
 			
 			//This below line is added for the QR Code genration on Shankhpal [16-08-2022]	
-			$firm_name_forqr = $customer_firm_data['firm_name'];			
+			$firm_name_forqr = $customer_firm_data['firm_name'];//updated on 25-04-2023, to get updated details, if changed appl in process			
 			$data = [$customer_id,$pdf_date,$certificate_valid_upto,$firm_name_forqr];
-			$result_for_qr = $this->Customfunctions->getQrCode($data);
-			$this->set('result_for_qr',$result_for_qr);				
+
+			//this condition is updated for the surrender application - Akash [11-05-2023]
+			if ($_SESSION['application_type'] == '9') {
+				$result_for_qr = $this->Customfunctions->getQrCode($data,'SOC');
+			} else {
+				$result_for_qr = $this->Customfunctions->getQrCode($data);
+			}
+
+			//Add for the surrender approved by name - Akash [17-08-2023]
+			if ($_SESSION['application_type'] == '9') {
+				$surrender_approved_by = $this->DmiUsers->getFullName($this->Session->read('username'));
+				$this->set('surrender_approved_by',$surrender_approved_by);
+			}
+
+			$this->set('result_for_qr',$result_for_qr);
 			
 			$this->generateGrantCerticatePdf('/Applicationformspdfs/grantLaboratoryCertificatePdf'); 
 		}
@@ -2388,8 +2640,8 @@ class ApplicationformspdfsController extends AppController{
 	//this function is created to generate pdf using tcpdf plugin
 	//This is called at place of Mpdf output function with required parameteres.
 	//on 23-01-2020 by Amol
-	public function callTcpdf($html,$mode,$customer_id,$pdf_for){
-	
+	public function callTcpdf($html,$mode,$customer_id,$pdf_for,$file_path=null){
+		
 		$with_esign = $this->Session->read('with_esign');
 		$current_level = $this->Session->read('current_level');
 		$file_name = $this->Session->read('pdf_file_name');
@@ -2411,15 +2663,52 @@ class ApplicationformspdfsController extends AppController{
 		
 			$file_path = $_SERVER["DOCUMENT_ROOT"].'/writereaddata/DMI/applications/'.$folderName.'/'.$file_name;
 			
-		}else{
+		#For SCN moved file directly to the Specific Folder - Akash[03-01-2022]
+		}elseif($pdf_for == 'showcause_notice'){
+			$file_path = $_SERVER["DOCUMENT_ROOT"].'/writereaddata/DMI/showcause_notice/'.$file_name;
+
+		}elseif( $appl_type == 4 && $pdf_for == 'chemist'){
+			//elseif section added by laxmi B. on 30-12-2022
+			//for this file path is sent from the pdf function
+			//it will take default file path from the argument, if pdf for is chemist
+																					   
+		} elseif($appl_type == 4 && $pdf_for == 'grant'){
+			$file_path = $_SERVER["DOCUMENT_ROOT"].'/writereaddata/DMI/temp/'.$file_name;
+		}
+		else{
 			$file_path = $_SERVER["DOCUMENT_ROOT"].'/writereaddata/DMI/temp/'.$file_name;
 		}
 		
 		//generatin pdf starts here
 		//create new pdf using tcpdf including signature apprearence to generate its hash below
 		require_once(ROOT . DS .'vendor' . DS . 'tcpdf' . DS . 'tcpdf.php');
-		$pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);	
-			
+		//below line is added on 23-05-2023 by Amol, to print water mark on pdf
+		require_once(ROOT . DS . 'vendor' . DS . 'tcpdf' . DS . 'tcpdf_text.php');
+
+		require_once(ROOT . DS . 'vendor' . DS . 'tcpdf' . DS . 'tcpdf_watermark.php');
+
+		
+                
+		//This below condition is updated for the Surrender (SOC) Application PDFs watermarks - Akash [12-05-2023]
+		if ($appl_type == 9 && $current_level != 'applicant') { 
+
+			$this->Session->write('for_module','Surrender');
+			$pdf = new PDF_Rotate(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
+
+		//This is added to add the watermark on the pdf if the pdf for suspension or cancelletion - Akash [05-06-2023]
+		} elseif ($this->Session->check('for_module')) {
+			$for_module = $this->Session->read('for_module');
+			if ($for_module === 'Suspension' || $for_module === 'Cancellation') {
+				$pdf = new PDF_Rotate(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
+			}
+
+		}elseif($appl_type == 4 && $pdf_for == 'grant'){ 
+			$pdf = new MyCustomPDFWithWatermark(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);	
+		}else{
+			$pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
+		}
+		
+		 
 			// set default monospaced font
 		//	$pdf->SetDefaultMonospacedFont(PDF_FONT_MONOSPACED);
 
@@ -2432,7 +2721,9 @@ class ApplicationformspdfsController extends AppController{
 		//added condition if renewal certificate and user is PAO/DDO
 		//then signature appearence not required
 		//on 16-09-2021 by Amol
-		if (!($appl_type==2 && $current_level=='pao')) {
+		#Updated : added the showcause_notice condtion for Shoe Cause Notices -> Akash[02-12-2022]
+		// added pdf_for chemist condition by laxmi on 02-01-2023 without sign pdf for ro schedule letter
+		if ((!($appl_type==2 && $current_level=='pao' && $pdf_for == 'showcause_notice')) && $pdf_for !='chemist' ) {
 
 			//only for save mode 'F' else no need in preview mode 'I'
 			if($mode == 'F' && $pdf_for != 'old' && $with_esign != 'no') {
@@ -2479,8 +2770,9 @@ class ApplicationformspdfsController extends AppController{
 		//added condition if renewal certificate and user is PAO/DDO
 		//then signature appearence not required
 		//on 16-09-2021 by Amol
-		if (!($appl_type==2 && $current_level=='pao')) {
-
+	    // added pdf_for chemist condition by laxmi on 02-01-2023 without sign pdf for ro schedule letter
+		if ((!($appl_type==2 && $current_level=='pao' && $pdf_for="showcause_notice")) && $pdf_for !='chemist') {
+		
 			//only for save mode 'F' else no need in preview mode 'I'
 			//to show esigned by block on pdf
 			if($mode == 'F' && $pdf_for != 'old' && $with_esign != 'no') {
@@ -3026,7 +3318,1190 @@ class ApplicationformspdfsController extends AppController{
 
 
 
+
+//Created new function and pdf view for the Change/modification application
+	//on 13-04-2023 by Amol
+	public function changeApplPdf(){
+
+		$this->loadModel('DmiFirms');
+		$this->loadModel('DmiDistricts');
+		$this->loadModel('DmiStates');
+		$this->loadModel('MCommodity');
+		$this->loadModel('MCommodityCategory');	
+		
+		//added on 27-03-2018, to set default value
+		$show_esigned_by = $this->Session->read('with_esign');		
+		$this->set('show_esigned_by',$show_esigned_by);		
+		$customer_id = $this->Session->read('username');		
+		$this->set('customer_id',$customer_id);
+		
+		$this->loadComponent('Randomfunctions');
+		$this->Randomfunctions->showChangedFieldsInApplPdf($customer_id);
+		
+		//get nodal office of the applied CA
+		$this->loadModel('DmiApplWithRoMappings');
+		$get_office = $this->DmiApplWithRoMappings->getOfficeDetails($customer_id);
+		$this->set('get_office',$get_office);
+		
+		$pdf_date = date('d-m-Y');
+		$this->set('pdf_date',$pdf_date);					
+		
+		// data from DMI firm Table					
+		$fetch_customer_firm_data = $this->DmiFirms->find('all',array('conditions'=>array('customer_id IS'=>$customer_id)))->first();
+		$customer_firm_data = $fetch_customer_firm_data;
+		$this->set('customer_firm_data',$customer_firm_data);		
+
+		// to show firm address name form id	
+		$fetch_district_name = $this->DmiDistricts->find('all',array('fields'=>'district_name','conditions'=>array('id IS'=>$customer_firm_data['district'], 'OR'=>array('delete_status IS NULL','delete_status ='=>'no'))))->first();
+		$firm_district_name = $fetch_district_name['district_name'];
+		$this->set('firm_district_name',$firm_district_name);
+		
+		$fetch_state_name = $this->DmiStates->find('all',array('fields'=>'state_name','conditions'=>array('id IS'=>$customer_firm_data['state'], 'OR'=>array('delete_status IS NULL','delete_status ='=>'no'))))->first();
+		$firm_state_name = $fetch_state_name['state_name'];
+		$this->set('firm_state_name',$firm_state_name);		
+		
+		// to show commodities and there selected sub-commodities
+		/*	$sub_commodity_array = explode(',',$customer_firm_data['sub_commodity']);
+
+		$i=0;
+		foreach($sub_commodity_array as $sub_commodity_id)
+		{			
+			$fetch_commodity_id = $this->MCommodity->find('all',array('conditions'=>array('commodity_code IS'=>$sub_commodity_id)))->first();
+			$commodity_id[$i] = $fetch_commodity_id['category_code'];			
+			$sub_commodity_data[$i] =  $fetch_commodity_id;			
+			$i=$i+1;
+		}
+
+		$unique_commodity_id = array_unique($commodity_id);		
+		$commodity_name_list = $this->MCommodityCategory->find('all',array('conditions'=>array('category_code IN'=>$unique_commodity_id, 'display'=>'Y')))->toArray();
+		$this->set('commodity_name_list',$commodity_name_list);		
+		$this->set('sub_commodity_data',$sub_commodity_data);*/
+		
+		$this->generateApplicationPdf('/Applicationformspdfs/changeApplPdf');	
+		
+		// $this->redirect(array('controller'=>'customers','action'=>'secondary_home'));	
+		
+	}
 	
 	
+	// Description : To generate the Application PDF for CA Firm for the flow of SOC.
+	// Created By: Akash Thakre
+	// Date: 08-12-2022
+	// Note : For Surrender of Certificate (SOC)
+
+	public function applPdfSurrenderCa(){
+
+		$this->loadModel('DmiFirms');
+		$this->loadModel('DmiCustomers');
+		$this->loadModel('DmiDistricts');
+		$this->loadModel('DmiStates');
+		$this->loadModel('MCommodity');
+		$this->loadModel('MCommodityCategory');
+		$this->loadModel('DmiSurrenderFormsDetails');
+		
+		$customer_id = $this->Session->read('username');
+		$this->set('customer_id',$customer_id);
+		
+		//get nodal office of the applied CA
+		$this->loadModel('DmiApplWithRoMappings');
+		$get_office = $this->DmiApplWithRoMappings->getOfficeDetails($customer_id);
+		$this->set('get_office',$get_office);
+		
+		$pdf_date = date('d-m-Y');
+		$this->set('pdf_date',$pdf_date);
+		
+		// data from DMI Firm Table
+		$firmData = $this->DmiFirms->find('all',array('conditions'=>array('customer_id IS'=>$customer_id)))->first();
+		$this->set('firmData',$firmData);
+
+		// data from DMI Customer Table
+		$customerData = $this->DmiCustomers->getCustomerDetails($firmData['customer_primary_id']);
+		$this->set('customerData',$customerData);
+
+		// to show firm distric name form id	
+		$firm_district_name = $this->DmiDistricts->getDistrictNameById($firmData['district']);
+		$this->set('firm_district_name',$firm_district_name);
+		
+		// to show firm state name form id	
+		$firm_state_name = $this->DmiStates->getStateNameById($firmData['state']);
+		$this->set('firm_state_name',$firm_state_name);		
+		
+		//surrender details
+		$surrenderData = $this->DmiSurrenderFormsDetails->sectionFormDetails($customer_id);
+		$this->set('surrenderData',$surrenderData);
+
+		// to show commodities and there selected sub-commodities
+		$sub_commodity_array = explode(',',$firmData['sub_commodity']);
+
+		$i=0;
+		foreach($sub_commodity_array as $sub_commodity_id)
+		{			
+			$fetch_commodity_id = $this->MCommodity->find('all',array('conditions'=>array('commodity_code IS'=>$sub_commodity_id)))->first();
+			$commodity_id[$i] = $fetch_commodity_id['category_code'];			
+			$sub_commodity_data[$i] =  $fetch_commodity_id;			
+			$i=$i+1;
+		}
+
+		$unique_commodity_id = array_unique($commodity_id);		
+		$commodity_name_list = $this->MCommodityCategory->find('all',array('conditions'=>array('category_code IN'=>$unique_commodity_id, 'display'=>'Y')))->toArray();
+		$this->set('commodity_name_list',$commodity_name_list);		
+		$this->set('sub_commodity_data',$sub_commodity_data);
+				
+		$this->generateApplicationPdf('/Applicationformspdfs/applPdfSurrenderCa');	
+	}
+
+
+	// Description : To generate the Application PDF for Printing press Firm for the flow of SOC.
+	// Created By: Akash Thakre
+	// Date: 08-12-2022
+	// Note : For Surrender of Certificate (SOC)
+
+	public function applPdfSurrenderPp(){
+
+		$this->loadModel('DmiFirms');
+		$this->loadModel('DmiCustomers');
+		$this->loadModel('DmiDistricts');
+		$this->loadModel('DmiStates');
+		$this->loadModel('MCommodity');
+		$this->loadModel('MCommodityCategory');
+		$this->loadModel('DmiSurrenderFormsDetails');
+		
+		$customer_id = $this->Session->read('username');
+		$this->set('customer_id',$customer_id);
+		
+		//get nodal office of the applied PP
+		$this->loadModel('DmiApplWithRoMappings');
+		$get_office = $this->DmiApplWithRoMappings->getOfficeDetails($customer_id);
+		$this->set('get_office',$get_office);
+		
+		$pdf_date = date('d-m-Y');
+		$this->set('pdf_date',$pdf_date);
+		
+		// data from DMI Firm Table
+		$firmData = $this->DmiFirms->find('all',array('conditions'=>array('customer_id IS'=>$customer_id)))->first();
+		$this->set('firmData',$firmData);
+
+		// data from DMI Customer Table
+		$customerData = $this->DmiCustomers->getCustomerDetails($firmData['customer_primary_id']);
+		$this->set('customerData',$customerData);
+
+		// to show firm distric name form id	
+		$firm_district_name = $this->DmiDistricts->getDistrictNameById($firmData['district']);
+		$this->set('firm_district_name',$firm_district_name);
+		
+		// to show firm state name form id	
+		$firm_state_name = $this->DmiStates->getStateNameById($firmData['state']);
+		$this->set('firm_state_name',$firm_state_name);		
+		
+		//surrender details
+		$surrenderData = $this->DmiSurrenderFormsDetails->sectionFormDetails($customer_id);
+		$this->set('surrenderData',$surrenderData);
+
+		$this->generateApplicationPdf('/Applicationformspdfs/applPdfSurrenderPp');	
+		
+	}
+
+
+
+	// Description : To generate the Application PDF for lab Firm for the flow of SOC.
+	// Created By: Akash Thakre
+	// Date: 08-12-2022
+	// Note : For Surrender of Certificate (SOC)
+
+	public function applPdfSurrenderLab(){
+
+		$this->loadModel('DmiFirms');
+		$this->loadModel('DmiCustomers');
+		$this->loadModel('DmiDistricts');
+		$this->loadModel('DmiStates');
+		$this->loadModel('MCommodity');
+		$this->loadModel('MCommodityCategory');
+		$this->loadModel('DmiSurrenderFormsDetails');
+		
+		$customer_id = $this->Session->read('username');
+		$this->set('customer_id',$customer_id);
+		
+		//get nodal office of the applied PP
+		$this->loadModel('DmiApplWithRoMappings');
+		$get_office = $this->DmiApplWithRoMappings->getOfficeDetails($customer_id);
+		$this->set('get_office',$get_office);
+		
+		$pdf_date = date('d-m-Y');
+		$this->set('pdf_date',$pdf_date);
+		
+		// data from DMI Firm Table
+		$firmData = $this->DmiFirms->find('all',array('conditions'=>array('customer_id IS'=>$customer_id)))->first();
+		$this->set('firmData',$firmData);
+
+		// data from DMI Customer Table
+		$customerData = $this->DmiCustomers->getCustomerDetails($firmData['customer_primary_id']);
+		$this->set('customerData',$customerData);
+
+		// to show firm distric name form id	
+		$firm_district_name = $this->DmiDistricts->getDistrictNameById($firmData['district']);
+		$this->set('firm_district_name',$firm_district_name);
+		
+		// to show firm state name form id	
+		$firm_state_name = $this->DmiStates->getStateNameById($firmData['state']);
+		$this->set('firm_state_name',$firm_state_name);		
+		
+		//surrender details
+		$surrenderData = $this->DmiSurrenderFormsDetails->sectionFormDetails($customer_id);
+		$this->set('surrenderData',$surrenderData);
+
+		// to show commodities and there selected sub-commodities
+		$sub_commodity_array = explode(',',$firmData['sub_commodity']);
+
+		$i=0;
+		foreach($sub_commodity_array as $sub_commodity_id)
+		{			
+			$fetch_commodity_id = $this->MCommodity->find('all',array('conditions'=>array('commodity_code IS'=>$sub_commodity_id)))->first();
+			$commodity_id[$i] = $fetch_commodity_id['category_code'];			
+			$sub_commodity_data[$i] =  $fetch_commodity_id;			
+			$i=$i+1;
+		}
+
+		$unique_commodity_id = array_unique($commodity_id);		
+		$commodity_name_list = $this->MCommodityCategory->find('all',array('conditions'=>array('category_code IN'=>$unique_commodity_id, 'display'=>'Y')))->toArray();
+		$this->set('commodity_name_list',$commodity_name_list);		
+		$this->set('sub_commodity_data',$sub_commodity_data);
+		
+		$this->generateApplicationPdf('/Applicationformspdfs/applPdfSurrenderLab');	
+		
+	}
+	
+	
+	
+	// Description : To generate the Report PDF for CA Firm for the flow of RTI.
+	// @Author : Shankhpal Shende
+	// #Date : 29/12/2022
+	// Note : For Routine Inspection (RTI)
+	
+	
+	// Description : Updated caRiReport function added new model name => DmiRtiCaPackerDetails
+	// @Author : Shankhpal Shende
+	// #Date : 12/05/2023
+	// Note : For Routine Inspection (RTI)
+
+
+	public function caRiReportPdf(){
+
+	  
+		$this->loadModel('DmiRtiCaPackerDetails');	 // changese modelname 13-05-2023
+		$this->loadModel('DmiFirms');	
+		$this->loadModel('DmiGrantCertificatesPdfs');
+		$this->loadModel('MCommodity');
+		$this->loadModel('DmiCaPpLabMapings');
+		$this->loadModel('DmiChemistRegistrations');
+		$this->loadModel('DmiCheckSamples');
+		$this->loadModel('DmiDistricts');
+		$this->loadModel('DmiStates');
+		
+
+		$customer_id = $this->Session->read('customer_id');
+		$this->set('customer_id',$customer_id);
+
+		// condition updated fetch last inserted record on 13/07/2023-shankhpal
+		$rti_ca_data = $this->DmiRtiCaPackerDetails->find('all', [
+    	'conditions' => ['customer_id' => $customer_id],
+    	'order' => ['id' => 'DESC'],
+    	'limit' => 1
+		])->first();
+		
+		$this->set('rti_ca_data',$rti_ca_data);
+
+		// data from DMI firm Table
+		$fetch_customer_firm_data = $this->DmiFirms->find('all',array('conditions'=>array('customer_id IS'=>$customer_id)))->first();
+		$customer_firm_data = $fetch_customer_firm_data;
+		$this->set('customer_firm_data',$customer_firm_data);
+
+		$pdf_date = date('d-m-Y');
+		$this->set('pdf_date',$pdf_date);
+
+		$fetch_district_name = $this->DmiDistricts->find('all',array('fields'=>'district_name','conditions'=>array('id IS'=>$customer_firm_data['district'], 'OR'=>array('delete_status IS NULL','delete_status ='=>'no'))))->first();
+		$firm_district_name = $fetch_district_name['district_name'];
+		$this->set('firm_district_name',$firm_district_name);
+
+		$fetch_state_name = $this->DmiStates->find('all',array('fields'=>'state_name','conditions'=>array('id IS'=>$customer_firm_data['state'], 'OR'=>array('delete_status IS NULL','delete_status ='=>'no'))))->first();
+		$firm_state_name = $fetch_state_name['state_name'];
+		$this->set('firm_state_name',$firm_state_name);
+
+		// Fetch data from DMI firm Table
+		$firm_details = $this->DmiFirms->firmDetails($customer_id);
+		$this->set('firm_details',$firm_details);	
+
+		$get_last_grant_date = $this->DmiGrantCertificatesPdfs->find('all',array('conditions'=>array('customer_id IS'=>$customer_id),'order'=>array('id desc')))->first();
+		$last_grant_date = $get_last_grant_date['date'];
+
+		$CustomersController = new CustomersController;
+		$certificate_valid_upto = $CustomersController->Customfunctions->getCertificateValidUptoDate($customer_id,$last_grant_date);
+		$this->set('certificate_valid_upto',$certificate_valid_upto);	
+
+		$added_firms = $this->DmiFirms->find('all',array('conditions'=>array('customer_id IS'=>$customer_id)))->first();
+
+		//taking id of multiple sub commodities	to show names in list	
+		$sub_comm_id = explode(',',(string) $added_firms['sub_commodity']); #For Deprecations
+
+		$sub_commodity_value = $this->MCommodity->find('list',array('valueField'=>'commodity_name', 'conditions'=>array('commodity_code IN'=>$sub_comm_id)))->toList();
+		$this->set('sub_commodity_value',$sub_commodity_value);
+		
+		$attached_lab = $this->DmiCaPpLabMapings->find('list',array('keyField'=>'id','valueField'=>'lab_id','conditions'=>array('customer_id IS'=>$customer_id),'order'=>'id asc'))->toList();
+		
+		$lab_list = [];
+		if(!empty($attached_lab)){
+			$lab_list = $this->DmiFirms->find('list',array('keyField'=>'id','valueField'=>'firm_name','conditions'=>array('customer_id like'=>'%'.'/3/'.'%','delete_status IS NULL','id IN'=>$attached_lab),'order'=>'firm_name asc'))->toArray();
+		}
+
+		$this->set('lab_list',$lab_list);
+
+		$attached_pp = $this->DmiCaPpLabMapings->find('list',array('keyField'=>'id','valueField'=>'pp_id','conditions'=>array('customer_id IS'=>$customer_id),'order'=>'id asc'))->toList();
+
+		$printers_list = [];
+		if(!empty($attached_pp)){
+			$printers_list = $this->DmiFirms->find('list',array('keyField'=>'id','valueField'=>'firm_name','conditions'=>array('customer_id like'=>'%'.'/2/'.'%','delete_status IS Null','id IN'=>$attached_pp),'order'=>'firm_name asc'))->toArray();
+		}
+		$this->set('printers_list',$printers_list);
+
+		//to get registerd chemist
+		$self_registered_chemist = $this->DmiChemistRegistrations->find('all',array('conditions'=>array('created_by IS'=>$customer_id)))->toArray();
+		$this->set('self_registered_chemist',$self_registered_chemist);
+
+		//get current version
+		$current_version = $CustomersController->Customfunctions->currentVersion($customer_id);
+
+		// to get added check sample table details
+		$added_sample_details = $this->DmiCheckSamples->find('all', array('conditions'=>array('customer_id IS'=>$customer_id,'delete_status IS NULL','version'=>$current_version),'order'=>'id'))->toArray();
+		$this->set('added_sample_details',$added_sample_details);
+
+		$this->generateReportPdf('/Applicationformspdfs/rtiCertificateForCa');
+		$this->redirect(array('controller'=>'dashboard','action'=>'home'));
+
+	}
+
+
+
+
+	// Description : To generate the Report PDF for printing press for the flow of RTI.
+	// @Author : Shankhpal Shende
+	// #Date : 29/12/2022
+	// Note : For Routine Inspection (RTI)
+
+	// Description : Updated the Report PDF for printing press for the flow of RTI.
+	// @Author : Shankhpal Shende
+	// #Date : 23/05/2023
+	// Note : For Routine Inspection (RTI)
+
+	public function ppRiReportPdf(){
+
+
+		$this->loadModel('DmiRoutineInspectionPpReports');
+		$this->loadModel('DmiFirms');
+		$this->loadModel('DmiGrantCertificatesPdfs');
+		$this->loadModel('DmiAllTblsDetails');
+		$this->loadModel('MCommodity');
+
+		$customer_id = $this->Session->read('customer_id');
+		$this->set('customer_id',$customer_id);
+
+		// condition updated fetch last inserted record on 13/07/2023-shankhpal
+		$rti_pp_data = $this->DmiRoutineInspectionPpReports->find('all', [
+    	'conditions' => ['customer_id' => $customer_id],
+    	'order' => ['id' => 'DESC'],
+    	'limit' => 1
+		])->first();
+	
+		$this->set('rti_pp_data',$rti_pp_data);
+
+		$firm_details = $this->DmiFirms->firmDetails($customer_id);
+		$this->set('firm_details',$firm_details);	
+
+		$conn = ConnectionManager::get('default');
+
+		$users = "SELECT DISTINCT map.customer_id, dff.firm_name,dff.sub_commodity
+				FROM dmi_firms AS df
+				INNER JOIN dmi_ca_pp_lab_mapings AS map ON map.pp_id=df.id::varchar
+				INNER JOIN dmi_firms AS dff ON dff.customer_id = map.customer_id
+				WHERE df.customer_id = '$customer_id' AND map.pp_id IS NOT NULL AND map.map_type = 'pp'";		
+
+		$q = $conn->execute($users);
+
+		$all_packers_records = $q->fetchAll('assoc');
+		$this->loadModel('MCommodity');
+		$MCommodity = TableRegistry::getTableLocator()->get('MCommodity');
+
+			$i=0;
+				$all_packers_value=array();
+			
+				foreach($all_packers_records as $value) // use for show list of CA id's
+				{
+						$packers_customer_id = $value['customer_id'];
+						$all_packers_value[$i]['customer_id'] = $value['customer_id'];
+						$all_packers_value[$i]['firm_name'] = $value['firm_name'];
+					
+						$Dmi_grant_certificates_pdfs = TableRegistry::getTableLocator()->get('DmiGrantCertificatesPdfs');
+						$get_last_grant_date = $Dmi_grant_certificates_pdfs->find('all',array('conditions'=>array('customer_id IS'=>$value['customer_id']),'order'=>array('id desc')))->first();
+				
+						$last_grant_date = $get_last_grant_date['date'];
+					
+						$CustomersController = new CustomersController;
+						$certificate_valid_upto = $CustomersController->Customfunctions->getCertificateValidUptoDate($value['customer_id'],$last_grant_date);
+				
+						$all_packers_value[$i]['validupto'] = $certificate_valid_upto;
+					
+						$DmiAllTblsDetails = TableRegistry::getTableLocator()->get('DmiAllTblsDetails');
+						// query updated by shankhpal on 19/05/2023
+						$tbl_list = $DmiAllTblsDetails->find('list',array('keyField'=>'id','valueField'=>'tbl_name', 'conditions'=>array('customer_id IN'=>$packers_customer_id,'delete_status IS NULL')))->toList();
+
+						$all_packers_value[$i]['tbl_name'] = $tbl_list;
+					
+						$sub_commodity_value = $MCommodity->find('list',array('keyField'=>'commodity_code','valueField'=>'commodity_name', 'conditions'=>array('commodity_code IN'=>explode(',',$value['sub_commodity']))))->toList();
+						$all_packers_value[$i]['sub_commodity'] = $sub_commodity_value;
+
+						$i=$i+1;
+				}
+
+		$this->loadModel('DmiRtiPackerDetails');
+		$this->loadModel('DmiFirms'); // added by shankhpal on 23/05/2023 for to office address
+		$added_packers_details = $this->DmiRtiPackerDetails->find('all', array('conditions'=>array('customer_id IS'=>$customer_id,'delete_status IS NULL'),'order'=>'id'))->toArray();
+		
+		$firm_data = $this->DmiFirms->find('all',array('keyField'=>'commodity_code','valueField'=>'commodity_name', 'conditions'=>array('customer_id IN'=> $customer_id)))->first(); // updated query toArray to first on 19/05/2023
+
+		$registered_office_address = $firm_data['street_address']; // added for Registered office address by shankhpal 19/05/2023
+
+		// load model DmiPrintingPremisesProfiles on 19/05/2023
+		$this->loadModel('DmiPrintingPremisesProfiles');
+		$premises_data = $this->DmiPrintingPremisesProfiles->find('all', array('valueField'=>'street_address', 'conditions'=>array('customer_id IS'=>$customer_id)))->first();
+		
+		$printing_premises_address = $premises_data['street_address'];   //to get printing_premises_address
+
+		$this->loadModel('DmiPackingTypes');
+		$added_firms = $this->DmiFirms->find('all',array('conditions'=>array('customer_id IS'=>$customer_id)))->toArray();	
+	
+		$added_firm_field = $added_firms[0];
+		//taking id of multiple Packaging Materials types to show names in list	
+		$packaging_type_id = explode(',',(string) $added_firm_field['packaging_materials']); #For Deprecations
+
+		$packaging_materials_value = $this->DmiPackingTypes->find('list',array('valueField'=>'packing_type', 'conditions'=>array('id IN'=>$packaging_type_id)))->toList();
+   
+		$this->set('added_packers_details',$added_packers_details);	
+		$this->set('sub_commodity_value',$sub_commodity_value);	
+		$this->set('all_packers_value',$all_packers_value);	
+		$this->set('registered_office_address',$registered_office_address);
+		$this->set('printing_premises_address',$printing_premises_address);
+		$this->set('packaging_materials_value',$packaging_materials_value);
+		$this->generateReportPdf('/Applicationformspdfs/rtiCertificateForPp'); 
+		$this->redirect(array('controller'=>'dashboard','action'=>'home'));
+	
+
+	}
+
+
+
+	// Description : To generate the Report PDF for lab for the flow of RTI.
+	// @Author : Shankhpal Shende
+	// #Date : 29/12/2022
+	// Note : For Routine Inspection (RTI)
+
+	public function labRiReportPdf(){
+
+		#Load Models
+		// $this->loadModel('DmiRoutineInspectionLabReports');  // Commented by shankhapl on 26/05/2023 for replce of new model name
+		$this->loadModel('DmiRtiLaboratoryDetails'); // added new table for rti module on 26/05/2023
+		$this->loadModel('DmiFirms');
+		$this->loadModel('MCommodity');
+
+		$customer_id = $this->Session->read('customer_id');
+		$this->set('customer_id',$customer_id);
+
+		// condition updated fetch last inserted record on 13/07/2023-shankhpal
+		$rti_lab_data = $this->DmiRtiLaboratoryDetails->find('all', [
+    	'conditions' => ['customer_id' => $customer_id],
+    	'order' => ['id' => 'DESC'],
+    	'limit' => 1
+		])->first();
+		$this->set('rti_lab_data',$rti_lab_data);
+
+		$firm_details = $this->DmiFirms->firmDetails($customer_id);
+		$this->set('firm_details',$firm_details);	
+
+		$added_firms = $this->DmiFirms->find('all',array('conditions'=>array('customer_id IS'=>$customer_id)))->first();
+		//taking id of multiple sub commodities	to show names in list	
+		$sub_comm_id = explode(',',(string) $added_firms['sub_commodity']); #For Deprecations
+
+		$sub_commodity_value = $this->MCommodity->find('list',array('valueField'=>'commodity_name', 'conditions'=>array('commodity_code IN'=>$sub_comm_id)))->toList();
+		$this->set('sub_commodity_value',$sub_commodity_value);
+
+		$conn = ConnectionManager::get('default');
+
+    $approved_chemist = "SELECT  cr.chemist_fname, cr.chemist_lname, cr.chemist_id,cr. created_by
+    FROM dmi_chemist_registrations AS cr
+    INNER JOIN dmi_chemist_final_submits AS cfs ON cfs.customer_id = cr.chemist_id
+    WHERE cr.created_by = '$customer_id' AND 
+    (((cr.is_training_completed IS NULL OR cr.is_training_completed='yes') AND status = 'approved' AND current_level = 'level_1')
+    OR (cr.is_training_completed='no' AND status = 'approved' AND current_level = 'level_3'))";
+
+    $q = $conn->execute($approved_chemist);
+
+    $all_approved_chemist = $q->fetchAll('assoc');
+		 $chemist_full_name = [];
+			
+    if (!empty($all_approved_chemist)) {
+      $chemist_full_name = [];
+      foreach ($all_approved_chemist as $each_chemist) {
+          $full_name = $each_chemist['chemist_fname'] . ' ' . $each_chemist['chemist_lname'];
+          $chemist_full_name[$full_name] = $full_name;
+      }
+    }else{
+        $chemist_full_name = [];
+        // Add other manual options if needed
+      
+    }
+		$this->set('chemist_full_name',$chemist_full_name);
+		$this->generateReportPdf('/Applicationformspdfs/rtiCertificateForLab'); 
+		$this->redirect(array('controller'=>'dashboard','action'=>'home'));
+	
+	}
+	
+	
+	
+	
+	               //Chemist application form pdf afetr chemist register and esign or without esign generate created by laxmi B on 13-12-2022
+				public function chemistApplPdf(){
+					$this->loadModel('DmiFirms');		
+					$this->loadModel('DmiUsers');
+					$this->loadModel('DmiStates');
+					$this->loadModel('DmiDistricts');
+					$this->loadModel('DmiChemistProfileDetails');
+					$this->loadModel('DmiChemistRegistrations');
+					$this->loadModel('MCommodity');
+					$this->loadModel('DmiRoOffices');
+					$this->loadModel('MCommodityCategory');
+								   
+
+
+					$customer_id = $this->Session->read('username');
+					$chemist_created_by = $this->Session->read('packer_id');
+					$this->set('customer_id',$customer_id);
+					// to fetch the ro office address using short code
+					if(!empty($chemist_created_by)){
+					$short_code =  trim($chemist_created_by,"/1234567890"); 
+					$ro_offices_data = $this->DmiRoOffices->find('all')->where(array('short_code IS'=>$short_code))->first();
+					
+
+					$export_unit = $this->Customfunctions->checkApplicantExportUnit($chemist_created_by);
+					if(!empty($export_unit) && $export_unit == 'yes'){
+						$ro_offices_data = $this->DmiRoOffices->find('all')->where(array('short_code IS'=>"MUM" ,'ro_office'=>'Mumbai'))->first();
+					}
+					
+					$roAddress=  str_replace(',', '<br />', $ro_offices_data['ro_office']);
+					$ro_address=  str_replace('&amp;', '&', $roAddress);
+
+					$this->set('ro_office_address', $ro_address);
+					}
+
+					$firm_data = $this->DmiFirms->find('all',array('conditions'=>array('customer_id IS'=>$chemist_created_by)))->first();
+
+					if(!empty($firm_data)){
+					$district = $this->DmiDistricts->find('all')->where(array('id IS'=>$firm_data['district']))->first();
+					if(!empty($district)){
+
+					$this->set('district', $district['district_name']);
+					}
+					$state = $this->DmiStates->find('all')->where(array('id IS'=>$firm_data['state']))->first();
+					if(!empty($state)){
+					$this->set('state', $state['state_name']);
+					}
+					$this->set('pin_code', $firm_data['postal_code']);
+                    
+                    // to find commodity from registrtion table added code by laxmi on 14-07-2023
+					$commodities = $this->DmiChemistRegistrations->find('all', ['conditions'=>['chemist_id IS'=>$customer_id]])->first();
+					$sub_commodity_array = explode(',',$commodities['sub_commodities']);
+					$i=0;
+					foreach ($sub_commodity_array as $key => $sub_commodity) {
+
+					$fetch_commodity_id = $this->MCommodity->find('all',array('conditions'=>array('commodity_code IS'=>$sub_commodity)))->first(); 
+					$commodity_id[$i] = $fetch_commodity_id['category_code'];
+					$sub_commodity_data[$i] =  $fetch_commodity_id;		
+					$i=$i+1;
+					}
+					$unique_commodity_id = array_unique($commodity_id); 
+					$commodity_name_list = $this->MCommodityCategory->find('all',array('conditions'=>array('category_code IN'=>$unique_commodity_id, 'display'=>'Y')))->toArray();	
+					$this->set('commodity_name_list',$commodity_name_list);		
+					$this->set('sub_commodity_data',$sub_commodity_data);
+
+
+					$chemist_fname = $this->Session->read('f_name');
+					$chemist_lname = $this->Session->read('l_name');
+					$this->set('fname', $chemist_fname);
+					$this->set('lname', $chemist_lname);
+					$this->set('firm_name', $firm_data['firm_name']);
+					if(!empty($firm_data['street_address'])){
+					$this->set('firm_address', $firm_data['street_address']);
+					}
+					} 
+
+					$chemist_profile_details = $this->DmiChemistProfileDetails->find('all')->where(array('customer_id IS'=>$customer_id))->first();
+					if(!empty($chemist_profile_details) && !empty($chemist_profile_details['address'])){
+					$this->set('chemist_address', $chemist_profile_details['address']);
+					}
+
+					$this->generateApplicationPdf('/Applicationformspdfs/chemistApplPdf'); 
+
+
+					}
+
+
+	             // Chemist Application Forwarded From RO to RAL as chemist training at RAL with letter pdf 
+				//  added by laxmi B. on 23-12-2022
+				//  added by laxmi B. on 23-12-2022
+				public function chemistAppPdfRoToRal(){  
+				$this->loadModel('DmiFirms');
+				$this->loadModel('DmiCustomers');
+				$this->loadModel('DmiDistricts');
+				$this->loadModel('DmiStates');
+				$this->loadModel('MCommodity');
+				$this->loadModel('MCommodityCategory');
+				$this->loadModel('DmiRoOffices');
+				$this->loadModel('DmiChemistPaymentDetails');
+				$this->loadModel('DmiUserRoles');
+				$this->loadModel('DmiChemistRegistrations');
+				$this->loadModel('DmiChemistRoToRalLogs');
+
+				$customer_id = $this->Session->read('customer_id');  
+				$application_type = $this->Session->read('application_type');
+				$ro_fname = $this->Session->read('f_name');
+				$ro_lname = $this->Session->read('l_name');
+				$role = $this->Session->read('role');
+				$this->set('customer_id', $customer_id);
+				$this->set('ro_fname', $ro_fname);
+				$this->set('ro_lname', $ro_lname);
+				$this->set('role', $role);
+
+
+				$pdf_date = date('d-m-Y');	
+				$this->set('pdf_date',$pdf_date);
+
+				$chemistdetails = $this->DmiChemistRegistrations->find('all')->where(array('chemist_id IS'=>$customer_id))->first();
+				if($this->Session->read('paymentSection') == 'available'){
+				$charge = $this->DmiChemistPaymentDetails->find('list', array('valueField'=>'amount_paid'))->where(array('customer_id'=>$customer_id))->first();
+				if(!empty($charge)){
+				$this->set('charges',$charge);
+
+				}
+				}
+
+				if(!empty($chemistdetails)){
+
+
+				$this->set('chemist_fname', $chemistdetails['chemist_fname']);
+				$this->set('chemist_lname', $chemistdetails['chemist_lname']);
+
+
+				$firmDetails = $this->DmiFirms->find('all')->where(array('customer_id IS'=>$chemistdetails['created_by']))->first();
+				if(!empty($firmDetails)){
+				$this->set('firmName',$firmDetails['firm_name']);
+				$this->set('firm_address',$firmDetails['street_address']);
+				$this->set('pin_code', $firmDetails['postal_code']);
+
+				$district = $this->DmiDistricts->find('all')->where(array('id IS'=>$firmDetails['district']))->first();
+				if(!empty($district)){
+
+				$this->set('district', $district['district_name']);
+				}
+				$state = $this->DmiStates->find('all')->where(array('id IS'=>$firmDetails['state']))->first();
+				if(!empty($state)){
+				$this->set('state', $state['state_name']);
+				}
+				// for multiple commodities select at export added by laxmi On 10-1-23
+				// to find commodity from registrtion table added code by laxmi on 14-07-2023
+				$commodities = $this->DmiChemistRegistrations->find('all', ['conditions'=>['chemist_id IS'=>$customer_id]])->first();
+				$sub_commodity_array = explode(',',$commodities['sub_commodities']);
+				
+				$i=0;
+				foreach ($sub_commodity_array as $key => $sub_commodity) {
+
+				$fetch_commodity_id = $this->MCommodity->find('all',array('conditions'=>array('commodity_code IS'=>$sub_commodity)))->first(); 
+				$commodity_id[$i] = $fetch_commodity_id['category_code'];
+				$sub_commodity_data[$i] =  $fetch_commodity_id;		
+				$i=$i+1;
+				}
+				$unique_commodity_id = array_unique($commodity_id); 
+				$commodity_name_list = $this->MCommodityCategory->find('all',array('conditions'=>array('category_code IN'=>$unique_commodity_id, 'display'=>'Y')))->toArray();
+
+				$this->set('commodity_name_list',$commodity_name_list);		
+				$this->set('sub_commodity_data',$sub_commodity_data);
+
+
+				}
+
+				$ral_officeData = $this->DmiChemistRoToRalLogs->find('all')->where(array('chemist_id IS'=>$customer_id))->first();
+
+				if(!empty($ral_officeData)){
+				$ral_id = $ral_officeData['ral_office_id'];
+				$ral_office = $this->DmiRoOffices->find('all')->where(array('id IS'=>$ral_id))->first();
+				$this->set('ral_office', $ral_office['ro_office']);
+				$this->set('ral_office_address', $ral_office['ro_office_address']);
+                
+				
+				$dateF = date('d-m-Y',strtotime(str_replace('/', '.',$ral_officeData['shedule_from'])));
+  
+				$dateTo = date('d-m-Y',strtotime(str_replace('/', '.',$ral_officeData['shedule_to'])));
+				$this->set('schedule_from',$dateF);
+				$this->set('schedule_to',$dateTo);
+				}
+
+				$all_data_pdf = $this->render('/Applicationformspdfs/chemist_app_pdf_ro_to_ral');
+
+				$split_customer_id = explode('/',(string) $customer_id); #For Deprecations
+
+				$pdfPrefix = 'forward_letter_to_ral';
+				$rearranged_id = $pdfPrefix.'('.$split_customer_id[0].'-'.$split_customer_id[1].'-'.$split_customer_id[2].')';
+																							
+
+				$application_type = $this->Session->read('application_type');
+				//check applicant last record version to increment		
+				$list_id = $this->DmiChemistRoToRalLogs->find('list', array('valueField'=>'id', 'conditions'=>array('chemist_id IS'=>$customer_id)))->toArray();
+ 
+				if(!empty($list_id))
+				{
+				$max_id = $this->DmiChemistRoToRalLogs->find('all', array('fields'=>'pdf_version', 'conditions'=>array('id'=>max($list_id))))->first();																	
+				$last_pdf_version 	=	$max_id['pdf_version'];
+
+				}
+				else{	$last_pdf_version = 0;	}				
+																																				 
+
+				$current_pdf_version = $last_pdf_version+1; //increment last version by 1//taking complete file name in session, which will be use in esign controller to esign the file.
+				$this->Session->write('pdf_file_name',$rearranged_id.'('.$current_pdf_version.')'.'.pdf');
+				$folderName = $this->Customfunctions->getFolderName($customer_id);
+				//creating filename and file path to save				
+				$file_path = '/writereaddata/DMI/chemist_training/ro_to_ral_letter/'.$rearranged_id.'('.$current_pdf_version.')'.'.pdf';
+
+				$filename = $_SERVER["DOCUMENT_ROOT"].$file_path;
+				//creating filename and file path to save	
+
+				$file_name = $rearranged_id.'('.$current_pdf_version.')'.'.pdf';
+										 
+
+				$this->DmiChemistRoToRalLogs->updateAll(
+				array('pdf_file' => $file_path, 'pdf_version'=>$current_pdf_version),
+				array('chemist_id'=>$customer_id));
+
+				$file_path = $_SERVER["DOCUMENT_ROOT"].$file_path;
+				//to preview application
+				$this->callTcpdf($all_data_pdf,'F',$customer_id,'chemist',$file_path);//with save mode
+				$this->callTcpdf($all_data_pdf,'I',$customer_id,'chemist',$file_path);//on with preview mode
+
+				$this->redirect('/dashboard/home');
+																							
+										   
+
+				}
+				}
+				
+				
+				//added new function to generate training completed pdf at ro on 02-01-2023 by laxmi B.
+				public function chemistTrainingCompPdfRo($id = null){
+				$this->loadModel('DmiFirms');	
+				$this->loadModel('DmiStates');
+				$this->loadModel('DmiDistricts');
+				$this->loadModel('DmiChemistRoToRalLogs');
+				$this->loadModel('DmiChemistTrainingAtRo');
+				$this->loadModel('DmiChemistRegistrations');
+				$this->loadModel('MCommodityCategory');
+				$this->loadModel('MCommodity');
+				$this->loadModel('DmiRoOffices');
+				$this->loadModel('DmiChemistProfileDetails');
+
+				$ro_fname = $this->Session->read('f_name');
+				$ro_lname = $this->Session->read('l_name');
+				$ro_role = $this->Session->read('role');
+
+				$this->set('ro_fname', $ro_fname);
+				$this->set('ro_lname', $ro_lname);
+				$this->set('role', $ro_role);
+                 
+				$chemistData = $this->DmiChemistTrainingAtRo->find('all',array('fields'=>array('chemist_id','chemist_fname','chemist_lname','ro_office_id')))->where(array('id IS'=>$id, 'training_completed IS'=>'1'))->first();
+				if(!empty($chemistData)){
+				$customer_id = $chemistData['chemist_id']; 
+				$this->set('customer_id',$chemistData['chemist_id']);
+				$this->set('chemist_fname',$chemistData['chemist_fname']);
+				$this->set('chemist_lname',$chemistData['chemist_lname']);
+                
+				// to set profile photo in letter added by laxmi on 12-07-2023
+                $chemist_profile= $this->DmiChemistProfileDetails->find('all',array('conditions'=>array('customer_id IS'=>$customer_id)))->first();
+				
+				if(!empty($chemist_profile)){
+					
+                    $this->set('profile_photo', $chemist_profile['profile_photo']);
+				}
+
+                   
+
+				$packer_id = $this->DmiChemistRegistrations->find('list', array('valueField'=>'created_by'))->where(array('chemist_id IS'=>$customer_id))->first();
+				if(!empty($packer_id)){
+				$firmData = $this->DmiFirms->find()->where(array('customer_id IS'=>$packer_id))->first();
+				$this->set('firmName',$firmData['firm_name']);
+				$this->set('firm_address',$firmData['street_address']);
+				$this->set('pin_code',$firmData['postal_code']);
+
+				$district = $this->DmiDistricts->find('list',array('valueField'=>'district_name'))->where(array('id IS'=>$firmData['district']))->first();
+				$state = $this->DmiStates->find('list',array('valueField'=>'state_name'))->where(array('id IS'=>$firmData['state']))->first();
+				$this->set('district',$district);
+				$this->set('state',$state);
+
+
+				// for multiple commodities select at export added by laxmi On 10-1-23
+				// to find commodity from registrtion table added code by laxmi on 14-07-2023
+				$commodities = $this->DmiChemistRegistrations->find('all', ['conditions'=>['chemist_id IS'=>$customer_id]])->first();
+				$sub_commodity_array = explode(',',$commodities['sub_commodities']);
+				$i=0;
+				foreach ($sub_commodity_array as $key => $sub_commodity) {
+
+				$fetch_commodity_id = $this->MCommodity->find('all',array('conditions'=>array('commodity_code IS'=>$sub_commodity)))->first(); 
+				$commodity_id[$i] = $fetch_commodity_id['category_code'];
+				$sub_commodity_data[$i] =  $fetch_commodity_id;		
+				$i=$i+1;
+				}
+				$unique_commodity_id = array_unique($commodity_id); 
+				$commodity_name_list = $this->MCommodityCategory->find('all',array('conditions'=>array('category_code IN'=>$unique_commodity_id, 'display'=>'Y')))->toArray();
+
+				$this->set('commodity_name_list',$commodity_name_list);		
+				$this->set('sub_commodity_data',$sub_commodity_data);	
+
+				}
+                $this->loadModel('DmiChemistROToRalLogs');
+				$scheduleDates = $this->DmiChemistROToRalLogs->find('all')->where(array('chemist_id IS'=>$customer_id, 'reshedule_status IS'=>'confirm'))->last();
+					
+				if(!empty($scheduleDates)){
+				$schedule_from = date('d-m-Y',strtotime(str_replace('/','-', $scheduleDates['ro_schedule_from'])));
+				$schedule_to = date('d-m-Y',strtotime(str_replace('/','-', $scheduleDates['ro_schedule_to'])));
+				$this->set('schedule_from',$schedule_from);
+				$this->set('schedule_to',$schedule_to);
+
+				}
+
+				$ro_office = $this->DmiRoOffices->find('list', array('valueField'=>'ro_office'))->where(array('id IS'=>$chemistData['ro_office_id']))->first();
+				$this->set('ro_office',$ro_office);
+
+				}
+
+
+				$all_data_pdf = $this->render('/Applicationformspdfs/chemist_training_comp_pdf_ro');
+
+				$split_customer_id = explode('/',(string) $customer_id); #For Deprecations
+
+				$pdfPrefix = 'reliving_letter_from_ro';
+				$rearranged_id = $pdfPrefix.'('.$split_customer_id[0].'-'.$split_customer_id[1].'-'.$split_customer_id[2].')';
+
+				//check applicant last record version to increment		
+				$list_id = $this->DmiChemistTrainingAtRo->find('list', array('valueField'=>'id', 'conditions'=>array('chemist_id IS'=>$customer_id)))->toArray();
+
+				if(!empty($list_id))
+				{
+				$max_id = $this->DmiChemistTrainingAtRo->find('all', array('fields'=>'pdf_version', 'conditions'=>array('id'=>max($list_id))))->first();																	
+				$last_pdf_version 	=	$max_id['pdf_version'];
+
+				}
+				else{	$last_pdf_version = 0;	}				
+
+				$current_pdf_version = $last_pdf_version+1; //increment last version by 1//taking complete file name in session, which will be use in esign controller to esign the file.
+				$this->Session->write('pdf_file_name',$rearranged_id.'('.$current_pdf_version.')'.'.pdf');
+
+				//creating filename and file path to save				
+				$file_path = '/writereaddata/DMI/chemist_training/training_at_ro/'.$rearranged_id.'('.$current_pdf_version.')'.'.pdf';
+
+				$filename = $_SERVER["DOCUMENT_ROOT"].$file_path;
+				//creating filename and file path to save				
+
+				$file_name = $rearranged_id.'('.$current_pdf_version.')'.'.pdf';
+
+				$this->DmiChemistTrainingAtRo->updateAll(
+				array('pdf_file' => $file_path, 'pdf_version'=>$current_pdf_version),
+				array('chemist_id'=>$customer_id));
+
+				$file_path = $_SERVER["DOCUMENT_ROOT"].$file_path;
+				//to preview application
+				$this->callTcpdf($all_data_pdf,'F',$customer_id,'chemist',$file_path);//with save mode
+				//$this->callTcpdf($all_data_pdf,'I',$customer_id,'chemist',$file_path);//on with preview mode
+
+				$this->redirect('/chemist/listOfChemistApplRalToRo');
+
+
+				} 
+
+	          	//chemist training approval certificate added by laxmi B. on 03-01-2022
+				public function chemistTrainingApprovalCertificate()
+				{
+				$this->loadModel('DmiFirms');		
+				$this->loadModel('DmiUsers');
+				$this->loadModel('DmiStates');
+				$this->loadModel('MCommodityCategory');
+				$this->loadModel('MCommodity');
+				$this->loadModel('DmiChemistRegistrations');
+				$this->loadModel('DmiDistricts');
+				$this->loadModel('DmiChemistRoToRalLogs');
+				$this->loadModel('DmiChemistRalToRoLogs');
+				$this->loadModel('DmiRoOffices');
+				$this->loadModel('DmiChemistProfileDetails');
+
+
+				$customer_id = $this->Session->read('customer_id');
+				$ro_fname    = $this->Session->read('f_name');
+				$ro_lname    = $this->Session->read('l_name');
+				$role    = $this->Session->read('role');
+
+				$this->set('customer_id',$customer_id);
+				$this->set('ro_fname',$ro_fname);
+				$this->set('ro_lname',$ro_lname);
+				$this->set('role',$role);
+
+				$chemist_data = $this->DmiChemistRegistrations->find('all', array( 'conditions'=>array('chemist_id IS'=>$customer_id)))->first();
+                  
+				$chemist_address= $this->DmiChemistProfileDetails->find('all',array('conditions'=>array('customer_id IS'=>$customer_id)))->first();
+               
+				$this->set('chemist_address',$chemist_address['address']);
+				$this->set('chemist_fname', $chemist_data['chemist_fname']);
+				$this->set('chemist_lname', $chemist_data['chemist_lname']);
+				$this->set('profile_photo', $chemist_address['profile_photo']);
+				$this->set('sign', $chemist_address['signature_photo']);
+				$this->set('middle_name_type', $chemist_address['middle_name_type']);
+				$this->set('middle_name', $chemist_address['middle_name']);
+				$this->set('profile_photo', $chemist_address['profile_photo']);
+
+				//set packer id in session and level_3
+				$this->Session->write('packer_id',$chemist_data['created_by'] );
+				$this->Session->write('current_level',"level_3");
+
+				// data from DMI firm Table					
+				$fetch_customer_firm_data = $this->DmiFirms->find('all',array('conditions'=>array('customer_id IS'=>$chemist_data['created_by'])))->first();
+				$customer_firm_data = $fetch_customer_firm_data;
+				$this->set('customer_firm_data',$customer_firm_data);		
+
+
+				$fetch_state_name = $this->DmiStates->find('all',array('fields'=>'state_name','conditions'=>array('id IS'=>$customer_firm_data['state'], 'OR'=>array('delete_status IS NULL','delete_status ='=>'no'))))->first();
+				$firm_state_name = $fetch_state_name['state_name'];
+				$this->set('firm_state_name',$firm_state_name);	
+
+
+
+				$pdf_date = date('d-m-Y');
+				$this->set('pdf_date',$pdf_date);
+
+				// to show firm address name form id		
+				$firm_district_name = $this->DmiDistricts->find('all', array('fields'=>'district_name', 'conditions'=>array('id IS'=>$customer_firm_data['district'])))->first();
+				$this->set('firm_district_name',$firm_district_name['district_name']);
+
+				//to show commodity name
+
+				$sub_commodity_array = explode(',',$chemist_data['sub_commodities']);
+				$i=0;
+				foreach ($sub_commodity_array as $key => $sub_commodity) {
+
+				$fetch_commodity_id = $this->MCommodity->find('all',array('conditions'=>array('commodity_code IS'=>$sub_commodity)))->first(); 
+				$commodity_id[$i] = $fetch_commodity_id['category_code'];
+				$sub_commodity_data[$i] =  $fetch_commodity_id;		
+				$i=$i+1;
+				}
+				$unique_commodity_id = array_unique($commodity_id); 
+				$commodity_name_list = $this->MCommodityCategory->find('all',array('conditions'=>array('category_code IN'=>$unique_commodity_id, 'display'=>'Y')))->toArray();
+
+				$this->set('commodity_name_list',$commodity_name_list);		
+				$this->set('sub_commodity_data',$sub_commodity_data);
+				//to fetch ral schedule training date
+				$roToRalData = $this->DmiChemistRalToRoLogs->find('all', array('conditions'=>array('chemist_id IS'=>$customer_id)))->last();
+				
+				if(!empty($roToRalData)){
+				$scheduleFrom = date('d-m-Y', strtotime(str_replace('/','.',$roToRalData['reshedule_from_date'])));
+				$scheduleTo = date('d-m-Y', strtotime(str_replace('/','.',$roToRalData['reshedule_to_date'])));
+                
+
+				//to fetch ral office name 
+				$raloffice = $this->DmiRoOffices->find('all',array('fields'=>'ro_office', 'conditions'=>array('id IS'=>$roToRalData['ral_office_id'])))->first();
+				if(!empty($raloffice)){
+                 $this->set('ral_office', $raloffice['ro_office']);
+				}
+				//to fetch RO schedule training date
+				$roToRalData = $this->DmiChemistRoToRalLogs->find('all', array('conditions'=>array('chemist_id IS'=>$customer_id)))->last();
+				
+				$roscheduleFrom = date('d-m-Y', strtotime(str_replace('/','.',$roToRalData['ro_schedule_from'])));
+				$roscheduleTo = date('d-m-Y', strtotime(str_replace('/','.',$roToRalData['ro_schedule_to'])));
+
+				$this->set('schedule_from',$scheduleFrom);
+				$this->set('shedule_to',$scheduleTo);
+				$this->set('ro_schedule_from',$roscheduleFrom);
+				$this->set('ro_shedule_to',$roscheduleTo);
+
+				//to fetch ro office name 
+				$office = $this->DmiRoOffices->find('all',array( 'conditions'=>array('id IS'=>$roToRalData['ro_office_id'])))->first();
+				
+				$this->set('ro_office',$office['ro_office']);
+				$this->set('office_type', $office['office_type']);
+				$this->set('ro_address', $office['ro_office_address']);
+				}
+
+				$ralToRoData = $this->DmiChemistRalToRoLogs->find('all', array('fields'=>array('ro_first_name', 'ro_last_name','ro_office_id'), 'conditions'=>array('chemist_id IS'=>$customer_id)))->first();
+				$this->set('ro_first_name',$ralToRoData['ro_first_name']);
+				$this->set('ro_last_name',$ralToRoData['ro_last_name']);
+				
+			////////////////////////////////////////////////////////////////////////////////////////////
+				// This code added for printing QR code 
+				// @Author : Shankhpal Shende
+				// Date : 13/07/2023
+				$full_name = $chemist_data['chemist_fname'] . ' ' . $chemist_data['chemist_lname'];
+				$dob = explode(" ", $chemist_data['dob'])[0]; // Shortened the code to directly assign the first element
+				$ro_office = $office['ro_office'];
+				$commodityNames = [];
+				if(!empty($sub_commodity_data)){
+					foreach ($sub_commodity_data as $entity) {
+						$commodityNames[] = $entity->commodity_name;
+					}
+					$commaSeparatedNames = implode(', ', $commodityNames);
+				}	else {
+    			$commaSeparatedNames = ''; // Added a default value if $sub_commodity_data is empty
+				}
+				$data = [$full_name,$dob,$commaSeparatedNames,$ro_office];
+				$result_for_qr = $this->Customfunctions->getQrCode($data,$type="CHMT");
+				$this->set('result_for_qr',$result_for_qr);
+				///////////////////////////////////////////////////////////////////////////////////////////																					   
+				$this->generateGrantCerticatePdf('/Applicationformspdfs/chemist_training_approval_certificate'); 
+
+				$this->redirect(array('controller'=>'dashboard','action'=>'home')); 
+
+				}
+  
+  
+            //chemist training schedule letter at RO side added by laxmi on 10-1-2023	 
+			public function trainingScheduleLetterFromRo(){
+
+			$this->loadModel('DmiFirms');		
+			$this->loadModel('DmiUsers');
+			$this->loadModel('DmiStates');
+			$this->loadModel('MCommodityCategory');
+			$this->loadModel('MCommodity');
+			$this->loadModel('DmiChemistRegistrations');
+			$this->loadModel('DmiDistricts');
+			$this->loadModel('DmiChemistRoToRalLogs');
+			$this->loadModel('DmiChemistRalToRoLogs');
+			$this->loadModel('DmiRoOffices');
+			$this->loadModel('DmiChemistProfileDetails');
+
+			$customer_id = $this->Session->read('customer_id');
+			$ro_fname    = $this->Session->read('f_name');
+			$ro_lname    = $this->Session->read('l_name');
+			$role    = $this->Session->read('role');
+
+			$this->set('customer_id',$customer_id);
+			$this->set('ro_fname',$ro_fname);
+			$this->set('ro_lname',$ro_lname);
+			$this->set('role',$role);
+
+			$chemist_data = $this->DmiChemistRegistrations->find('all', array('conditions'=>array('chemist_id IS'=>$customer_id)))->first();
+               
+			$chemist_address= $this->DmiChemistProfileDetails->find('all',array('conditions'=>array('customer_id IS'=>$customer_id)))->first();
+           
+			$this->set('chemist_address',$chemist_address['address']);
+			$this->set('chemist_fname', $chemist_data['chemist_fname']);
+			$this->set('chemist_lname', $chemist_data['chemist_lname']);
+			$this->set('profile_photo', $chemist_address['profile_photo']);
+
+			//set packer id in session and level_3
+			$this->Session->write('packer_id',$chemist_data['created_by'] );
+			$this->Session->write('current_level',"level_3");
+
+			// data from DMI firm Table					
+			$fetch_customer_firm_data = $this->DmiFirms->find('all',array('conditions'=>array('customer_id IS'=>$chemist_data['created_by'])))->first();
+			$customer_firm_data = $fetch_customer_firm_data;
+
+			$this->set('customer_firm_data',$customer_firm_data);		
+
+
+			$fetch_state_name = $this->DmiStates->find('all',array('fields'=>'state_name','conditions'=>array('id IS'=>$customer_firm_data['state'], 'OR'=>array('delete_status IS NULL','delete_status ='=>'no'))))->first();
+			$firm_state_name = $fetch_state_name['state_name'];
+			$this->set('firm_state_name',$firm_state_name);	
+
+
+
+			$pdf_date = date('d-m-Y');
+			$this->set('pdf_date',$pdf_date);
+
+			// to show firm address name form id		
+			$firm_district_name = $this->DmiDistricts->find('all', array('fields'=>'district_name', 'conditions'=>array('id IS'=>$customer_firm_data['district'])))->first();
+			$this->set('firm_district_name',$firm_district_name['district_name']);
+
+			//to show commodity name
+
+			$sub_commodity_array = explode(',',$chemist_data['sub_commodities']);
+			$i=0;
+			foreach ($sub_commodity_array as $key => $sub_commodity) {
+
+			$fetch_commodity_id = $this->MCommodity->find('all',array('conditions'=>array('commodity_code IS'=>$sub_commodity)))->first(); 
+			$commodity_id[$i] = $fetch_commodity_id['category_code'];
+			$sub_commodity_data[$i] =  $fetch_commodity_id;		
+			$i=$i+1;
+			}
+			$unique_commodity_id = array_unique($commodity_id); 
+			$commodity_name_list = $this->MCommodityCategory->find('all',array('conditions'=>array('category_code IN'=>$unique_commodity_id, 'display'=>'Y')))->toArray();
+
+			$this->set('commodity_name_list',$commodity_name_list);		
+			$this->set('sub_commodity_data',$sub_commodity_data);
+			//to fetch ral name
+			$roToRalData = $this->DmiChemistRoToRalLogs->find('all', array('conditions'=>array('chemist_id IS'=>$customer_id)))->last(); 
+			$this->Session->write('application_type',$roToRalData['appliaction_type'] );
+			if(!empty($roToRalData)){
+			$scheduleFrom = date('d-m-Y', strtotime(str_replace('/','-',$roToRalData['ro_schedule_from'])));
+			$scheduleTo = date('d-m-Y', strtotime(str_replace('/','-',$roToRalData['ro_schedule_to'])));
+			  
+			$this->set('schedule_from',$scheduleFrom);
+			$this->set('shedule_to',$scheduleTo);
+
+			//to fetch ro office name 
+			$office = $this->DmiRoOffices->find('all',array('fields'=>'ro_office', 'conditions'=>array('id IS'=>$roToRalData['ro_office_id'])))->first();
+			$this->set('ro_office',$office['ro_office']);
+			}
+
+
+			$all_data_pdf = $this->render('/Applicationformspdfs/training_schedule_letter_from_ro');
+
+			$split_customer_id = explode('/',(string) $customer_id); #For Deprecations
+
+			$pdfPrefix = 'training_schedule_letter_at_ro';
+			$rearranged_id = $pdfPrefix.'('.$split_customer_id[0].'-'.$split_customer_id[1].'-'.$split_customer_id[2].')';
+
+			//check applicant last record version to increment		
+			$list_id = $this->DmiChemistRoToRalLogs->find('list', array('valueField'=>'id', 'conditions'=>array('chemist_id IS'=>$customer_id)))->last();
+		
+			if(!empty($list_id))
+			{
+			$max_id = $this->DmiChemistRoToRalLogs->find('all', array('fields'=>'pdf_version', 'conditions'=>array('id'=>$list_id)))->first();																	
+			
+			$last_pdf_version 	=	$max_id['pdf_version'];
+
+			}
+			else{	$last_pdf_version = 0;	}				
+
+			$current_pdf_version = $last_pdf_version; //increment last version by 1//taking complete file name in session, which will be use in esign controller to esign the file.
+			$this->Session->write('pdf_file_name',$rearranged_id.'('.$current_pdf_version.')'.'.pdf');
+			
+			//creating filename and file path to save				
+			$file_path = '/writereaddata/DMI/chemist_training/training_schedule_letter_at_ro/'.$rearranged_id.'('.$current_pdf_version.')'.'.pdf';
+			
+			$filename = $_SERVER["DOCUMENT_ROOT"].$file_path;
+			//creating filename and file path to save				
+			
+			$file_name = $rearranged_id.'('.$current_pdf_version.')'.'.pdf';
+			$$current_pdf_version = $current_pdf_version + 1;
+			$this->DmiChemistRoToRalLogs->updateAll(
+			array('ro_schedule_letter' => $file_path,'pdf_version'=>$current_pdf_version),
+			array('chemist_id'=>$customer_id));
+
+			$file_path = $_SERVER["DOCUMENT_ROOT"].$file_path;
+		
+			//to preview application
+			$this->callTcpdf($all_data_pdf,'F',$customer_id,'chemist',$file_path);//with save mode
+			//$this->callTcpdf($all_data_pdf,'I',$customer_id,'chemist',$file_path);//on with preview mode
+
+			$this->redirect('/chemist/listOfChemistApplRalToRo');
+			}																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																															  
 }	
 ?>

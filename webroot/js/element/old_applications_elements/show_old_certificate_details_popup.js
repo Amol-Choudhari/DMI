@@ -166,6 +166,12 @@
 			var get_grant_month = split_grant_date[1];
 			var get_grant_year = split_grant_date[2];
 
+			/* below condition added on 28-07-2023 by Amol, to manage lab export appl. validity date on popup 
+				to show NABL accreditation validity date only */
+			var export_unit_status_id = $("#export_unit_status_id").val();
+			if(certification_type == 3 && export_unit_status_id=='yes'){
+				return valid_upto_date = $("#valid_upto_date_id").val();
+			}
 			
 			//condition applied on 23-09-2022 for new order validity date as per order on "01-04-2021"
 			//now PP and Labs will also have validity of 5 years. grant after 31-03-2021

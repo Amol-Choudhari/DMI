@@ -93,6 +93,10 @@
 											} elseif  ($masterId=='19') {
 
 												echo $this->element('masters_management_elements/add_master_elements/add_document_type');
+					
+											} elseif ($masterId=='20') {
+												// For Routine Inspection (RTI) added by shankhpal shende on 06/11/2022
+												echo $this->element('masters_management_elements/add_master_elements/add_period');
 											}
 										?>
 									</div>

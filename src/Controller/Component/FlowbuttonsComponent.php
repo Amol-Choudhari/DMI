@@ -61,7 +61,7 @@ class FlowbuttonsComponent extends Component {
 		
 		if(!empty($showForwardBtn) && $all_report_status == 'true'){
 			
-			if($applicationType==1){
+			if($applicationType==1 || $applicationType==3){//added $applicationType==3 on 13-04-2023
 				
 				if($office_type == 'RO' && $hoInspectionExist=='yes' && empty($check_ho_allocation)){
 					
@@ -107,14 +107,14 @@ class FlowbuttonsComponent extends Component {
 				}
 				
 			}elseif($applicationType==3){
-				
-				if($office_type == 'SO'){
+				//commented on 13-04-2023
+				/*if($office_type == 'SO'){
 					
 					if($firm_type ==2){
 						
 						$ForwarBtn = 'RO';
 					}
-				}
+				}*/
 			}elseif($applicationType == 5){//added on 18-11-2021 for 15 digit flow
 
 				if($office_type == 'SO'){
@@ -146,7 +146,11 @@ class FlowbuttonsComponent extends Component {
 		$Dmi_flow_wise_tables_list = TableRegistry::getTableLocator()->get('DmiFlowWiseTablesLists');
 		$Dmi_ama_approved_model = $Dmi_flow_wise_tables_list->getFlowWiseTableDetails($applicationType,'ama_approved_application');
 		$Dmi_ama_approved_application = TableRegistry::getTableLocator()->get($Dmi_ama_approved_model);
-		$check_ama_approval = $Dmi_ama_approved_application->find('all',array('conditions'=>array('customer_id IS'=>$customerId)))->first();
+
+		//added on 24-04-2023
+		$grantDateCondition = $this->Customfunctions->returnGrantDateCondition($customerId,$applicationType);
+		//updated condition on 24-04-2023 for "grantdatecondition" on ama approved records
+		$check_ama_approval = $Dmi_ama_approved_application->find('all',array('conditions'=>array('customer_id IS'=>$customerId,$grantDateCondition)))->first();
 		
 		$inspection_report_section = TableRegistry::getTableLocator()->get('DmiCommonSiteinspectionFlowDetails');
 		$all_report_status = $inspection_report_section->reportSectionApproveStatus($customerId,$allSectionDetails);
@@ -160,8 +164,9 @@ class FlowbuttonsComponent extends Component {
 		$firm_type = $this->Customfunctions->firmType($customerId);
 		
 		if(!empty($showGrantBtn) && $all_report_status == 'true'){
-			
-			if($applicationType==1){
+			// $applicationType == 5 added for 15-digit code application  Grant 
+			// added by shankhpal shende on 16/06/2023
+			if($applicationType==1 || $applicationType==3 || $applicationType == 5){//added $applicationType == 3 on 13-04-2023
 				
 				if($office_type=='RO'){
 					
@@ -210,7 +215,9 @@ class FlowbuttonsComponent extends Component {
 						$GrantBtn = 'yes';
 					}
 				}
-			}elseif($applicationType==3){
+			}
+			//commented on 13-04-2023
+			/*elseif($applicationType==3){
 				
 				if($office_type=='RO'){
 					
@@ -224,6 +231,17 @@ class FlowbuttonsComponent extends Component {
 					}
 				}
 				
+			
+			}*/
+			//added condition n 08-08-2023 by Amol
+			//to show grant button to RO for RO jurisdiction FDC appl.
+			elseif($applicationType==5){
+				
+				if($office_type=='RO'){
+					
+					$GrantBtn = 'yes';
+					
+				}
 			}
 			
 			
@@ -287,6 +305,10 @@ class FlowbuttonsComponent extends Component {
 					}if($inspection == 'no' && $firm_type ==2){
 						
 						$ForwarBtn = 'RO';
+						
+					//to check if CA with BEVO then forward to RO, added on 24-05-2023 by Amol
+					}if($inspection == 'no' && $firm_type ==1 && $ca_bevo_applicant == 'yes'){
+						$ForwarBtn = 'RO';										
 					}
 					
 				}elseif($office_type == 'RO'){
@@ -391,7 +413,8 @@ class FlowbuttonsComponent extends Component {
 				
 				if($office_type == 'SO'){
 					
-					if($inspection == 'no' && $firm_type ==1 ){
+					//added CA Bevo condition on 24-05-2023 by Amol
+					if($inspection == 'no' && $firm_type ==1 && $ca_bevo_applicant != 'yes'){
 						
 						$GrantBtn = 'yes';
 					}
@@ -399,6 +422,29 @@ class FlowbuttonsComponent extends Component {
 				}if($office_type == 'RO'){
 					
 					if($inspection == 'no' && ($firm_type ==1 || $firm_type ==2 || $firm_type ==3)){
+						
+						$GrantBtn = 'yes';
+					}
+					
+				}
+			
+			}
+
+			//This below Block of code is added to show the Final Grant Button after scrutiny for surrender flow - Akash[13-04-2023]
+			if($applicationType == 9 && $allSectionStatus == 2){
+				
+				$inspection = $this->Customfunctions->inspRequiredForChangeApp($customerId,$applicationType);
+				
+				if($office_type == 'SO'){
+					
+					if($inspection == 'no' && $firm_type ==1 ){
+						
+						$GrantBtn = 'yes';
+					}
+					
+				}if($office_type == 'RO'){
+					
+					if($inspection == 'no' && ($firm_type ==1 || $firm_type ==2)){
 						
 						$GrantBtn = 'yes';
 					}
@@ -445,7 +491,7 @@ class FlowbuttonsComponent extends Component {
 		
 		//if(empty($ho_allocation)){
 			
-			if($applicationType == 1){
+			if($applicationType == 1 || $applicationType == 3){//added appl type 3 condition on 13-04-2023 by Amol
 				
 				if($firm_type==2){
 					
